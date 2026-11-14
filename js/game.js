@@ -233,10 +233,10 @@
         case 'tooFast': G.swing = 1; sfx('tap'); break;
         case 'tama': floatText(46, 340, '玉 +1', '#ffe066', 20, 1.2); tip('tama', 'ちょっかいを つかってみよう!(下の3つ)'); break;
         case 'item':
-          sfx('item'); floatText(195, 330, D.ITEMS[e.item].name + ' ゲット!', '#fff3a0', 20, 1.4);
+          sfx('item'); floatText(195, 300, D.ITEMS[e.item].name + ' ゲット!', '#fff3a0', 20, 1.4);
           tip('item', e.item === 'shield' ? 'まもり:1回だけ 見つかっても セーフ!' : 'アイテムを ためしてみて!(右の わく)');
           break;
-        case 'itemPoints': floatText(300, 360, '+100', '#fff3a0', 22, 1); break;
+        case 'itemPoints': floatText(330, 330, '+100', '#fff3a0', 22, 1); break;
         case 'bomb':
           sfx('angry'); burst(195, 480, '#ffb020', 26, 260); burst(195, 480, '#555', 14, 200); G.shake = 0.5; G.flash = 0.7; G.flashCol = '255,200,80';
           if (G.ptsText) { var bi = G.texts.indexOf(G.ptsText); if (bi >= 0) G.texts.splice(bi, 1); }
@@ -261,13 +261,13 @@
   function onDrop(e) {
     var S = G.S, b = e.block, col = blockColor(b.t);
     G.swing = 1; G.fall = Math.max(G.fall, (b.kind === 'double' ? 2 : 1) * C.BLOCK_H);
-    G.flyers.push({ kind: D.BLOCKS[b.t].art, x: 195, y: TOWER_BOTTOM - (b.kind === 'double' ? C.BLOCK_H : C.BLOCK_H / 2), vx: 520 + Math.random() * 100, vy: -720 - Math.random() * 120, rot: 0, vr: 5 + Math.random() * 3, age: 0, h: b.kind === 'double' ? C.BLOCK_H * 2 + 6 : C.BLOCK_H + 6 });
+    if (!e.auto || G.lastRng() < 0.5) G.flyers.push({ kind: D.BLOCKS[b.t].art, x: 195, y: TOWER_BOTTOM - (b.kind === 'double' ? C.BLOCK_H : C.BLOCK_H / 2), vx: 520 + Math.random() * 100, vy: -720 - Math.random() * 120, rot: 0, vr: 5 + Math.random() * 3, age: 0, h: b.kind === 'double' ? C.BLOCK_H * 2 + 6 : C.BLOCK_H + 6 });
     burst(250, 498, col, e.auto ? 3 : 8, 180);
     if (!e.auto || Math.random() < 0.5) sfx(b.t === 'kin' || b.t === 'niji' ? 'gold' : 'drop');
     var hex = D.BLOCKS[b.t].hex;
     if (e.perfect) {
       if (G.perfText && G.texts.indexOf(G.perfText) >= 0) { G.perfText.text = 'むてき +' + fmt(S.perfPts || 0); G.perfText.t0 = G.at - 0.2; }
-      else { G.perfText = floatText(250, 470, 'むてき +' + fmt(S.perfPts || 0), '#ffe066', 24, 1.0); }
+      else { G.perfText = floatText(240, 490, 'むてき +' + fmt(S.perfPts || 0), '#ffe066', 24, 1.0); }
     } else {
       if (G.ptsText) { var ix = G.texts.indexOf(G.ptsText); if (ix >= 0) G.texts.splice(ix, 1); }
       G.ptsText = floatText(250, 474, '+' + fmt(e.pts) + (e.squeeze ? ' すべりこみ!' : ''), e.squeeze ? '#ff7070' : hex, e.pts >= 100 ? 26 : 24, 0.8);
@@ -633,7 +633,7 @@
     ctx.restore();
     if (b.kind === 'mash' || b.kind === 'mochi' || b.kind === 'double' || b.kind === 'hibi') text('あと' + b.hp + '回', 140, cy + 1, 16, '#ffffff', 'center', 900, '#1b1430', 4);
     if ((b.kind === 'ring' && D.ringInfo(b, S.t).dist <= D.ringWindow(S)) || (b.kind === 'slide' && D.slideInfo(b, S.t).dist <= C.SLIDE_WINDOW)) {
-      if (!dangerNow(S, S.t)) text('いま!', 138, cy - 1, 17, '#40ff70', 'center', 900, '#1b1430', 4);
+      if (!dangerNow(S, S.t) && D.kindAt(S.d, S.t) !== 'PERFECT') text('いま!', 138, cy - 1, 17, '#40ff70', 'center', 900, '#1b1430', 4);
     }
   }
   // 後ろ姿でも 気分が分かる しるし
@@ -901,7 +901,15 @@
     if (st === 'warn' || st === 'watch') { ctx.strokeStyle = 'rgba(255,30,30,' + (st === 'watch' ? 0.85 : 0.6 + 0.2 * pulse) + ')'; ctx.lineWidth = st === 'watch' ? 9 : 7; ctx.strokeRect(4, 4, W - 8, H - 8); }
     ctx.restore();
   }
-  function drawFx(dt) {
+  function drawFlyers(dt) {
+    var i;
+    for (i = G.flyers.length - 1; i >= 0; i--) {
+      var f = G.flyers[i]; f.age += dt; if (f.age > 1.4 || f.y > H + 100) { G.flyers.splice(i, 1); continue; }
+      f.x += f.vx * dt; f.y += f.vy * dt; f.vy += 900 * dt; f.rot += f.vr * dt;
+      safeDraw('drawBlock', [ctx, f.x, f.y, C.BLOCK_W * 0.75, f.h * 0.85, f.kind, { t: G.at, rot: f.rot, alpha: Math.max(0, 1 - f.age / 1.4) }]);
+    }
+  }
+  function drawFx(dt, withFlyers) {
     var i;
     for (i = G.fx.length - 1; i >= 0; i--) {
       var p = G.fx[i]; p.age += dt; if (p.age > p.life) { G.fx.splice(i, 1); continue; }
@@ -909,11 +917,7 @@
       ctx.globalAlpha = 1 - p.age / p.life; ctx.fillStyle = p.col; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.283); ctx.fill();
     }
     ctx.globalAlpha = 1;
-    for (i = G.flyers.length - 1; i >= 0; i--) {
-      var f = G.flyers[i]; f.age += dt; if (f.age > 1.4 || f.y > H + 100) { G.flyers.splice(i, 1); continue; }
-      f.x += f.vx * dt; f.y += f.vy * dt; f.vy += 900 * dt; f.rot += f.vr * dt;
-      safeDraw('drawBlock', [ctx, f.x, f.y, C.BLOCK_W * 0.75, f.h * 0.85, f.kind, { t: G.at, rot: f.rot, alpha: Math.max(0, 1 - f.age / 1.4) }]);
-    }
+    if (withFlyers) drawFlyers(dt);
     for (i = G.texts.length - 1; i >= 0; i--) {
       var tx = G.texts[i], a = (G.at - tx.t0) / tx.dur; if (a > 1) { G.texts.splice(i, 1); continue; }
       ctx.globalAlpha = a < 0.7 ? 1 : 1 - (a - 0.7) / 0.3;
@@ -982,6 +986,7 @@
     var hp = drawTowerAndHead(S, t);
     drawStatus(S);
     drawLeftColumn(S, t);
+    drawFlyers(dt);                         // 飛ぶ段は アイテムの枠・ボタンより後ろ
     drawSlots(S, t);
     drawChotto(S, t);
     drawTon(S, t);
@@ -1018,7 +1023,7 @@
         }
         sfx('drop');
       }
-      drawFx(dt);
+      drawFx(dt, true);
       var hy = 300 - ez * 20, size = HEAD.size + ez * 100;
       safeDraw('drawHead', [ctx, HEAD.x, hy, size, { turn: 1, mood: face, t: G.at, shake: 0 }]);
       var s = 1 + 0.3 * Math.max(0, 1 - (ot - C.OUT_FREEZE) / 0.25);
