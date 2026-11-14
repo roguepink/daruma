@@ -194,7 +194,7 @@
     G.S = D.newGame({ seed: seed, tutorial: tutorial, firstPlay: G.rec.stats.plays === 0, daily: G.daily.mood });
     G.mode = 'play'; G.paused = false; G.countdown = 0; G.acc = 0;
     G.fx = []; G.flyers = []; G.texts = []; G.bubble = null; G.pbubble = null; G.tip = null; G.flash = 0; G.shake = 0; G.fall = 0;
-    G.pop = null; G.flop = null; G.goldenView = null;
+    G.pop = null; G.flop = null; G.goldenView = null; G.big = null; G.ptsText = null;
     G.goalPassed = {}; G.goalBestDan = G.rec.bestDan; G.sceneIdx = null; G.netaAt = null; G.backNetaAt = 0; G.ippoText = G.at + 1.6;
     G.chantAt = []; G.faceOver = null; G.sessionFaces = {}; G.faceTag = null; G.outInfo = null; G.tapX = null; G.comboEnd = 0;
     if (tutorial) { say('れんしゅう だよ!むこうを むいたら トン!', 3); }
@@ -226,6 +226,25 @@
   // ヒントを出してはいけない時(だるまさんが見そう・見ている・むてき中)
   function tipBlocked(S) { var k = D.kindAt(S.d, S.t); return k === 'WARN' || k === 'FEINT' || k === 'GRACE' || k === 'WATCH' || k === 'PERFECT' || !!S.golden || midWarn(S, S.t); }
   function tip(key, text) { if (G.tipsShown[key]) return; G.tipsShown[key] = true; G.tip = { text: text, until: G.at + 3.2, t0: G.at }; }
+  var BIG_Y = 360, BIG_X = 236, BIG_W = 272;   // 大きな文字の 場所(左の列「ころんだ」「この回」の 右。吹き出しと 重ならない)
+  function bigMsg(text, col, size, dur, prio) {
+    var b = G.big;
+    if (b && G.at - b.t0 < b.dur && b.prio > prio) return null;   // もっと大事な字が 出ている
+    G.big = { text: text, col: col, size: size, dur: dur || 1.0, prio: prio, t0: G.at };
+    if (prio >= 2 && G.ptsText) { var ix = G.texts.indexOf(G.ptsText); if (ix >= 0) G.texts.splice(ix, 1); G.ptsText = null; }
+    return G.big;
+  }
+  function bigBusy(minPrio) { var b = G.big; return !!b && G.at - b.t0 < b.dur && b.prio >= minPrio; }
+  function drawBig() {
+    var b = G.big; if (!b) return;
+    var a = (G.at - b.t0) / b.dur; if (a >= 1) { G.big = null; return; }
+    ctx.save(); ctx.globalAlpha = a < 0.75 ? 1 : 1 - (a - 0.75) / 0.25;
+    var sc = a < 0.12 ? 0.6 + a / 0.12 * 0.5 : 1.1 - Math.min(0.1, a - 0.12);
+    ctx.font = '900 ' + (b.size * sc) + 'px ' + FONT;
+    var wmax = ctx.measureText(b.text).width, s2 = wmax > BIG_W ? BIG_W / wmax : 1;
+    text(b.text, BIG_X, BIG_Y - a * 16, b.size * sc * s2, b.col, 'center', 900, '#1b1430', Math.max(4, b.size * 0.2));
+    ctx.restore();
+  }
   function floatText(x, y, text, col, size, dur) { var o = { x: x, y: y, text: text, col: col || '#fff', size: size || 22, t0: G.at, dur: dur || 0.9 }; G.texts.push(o); return o; }
   function burst(x, y, col, n, spd) {
     for (var i = 0; i < n; i++) {
@@ -287,7 +306,7 @@
         case 'goldSeen': say('いま 金色の なにか 飛んでかなかった?', 2.0); break;
         case 'perfectEnd':
           say('はっ!ちょうちょ 行っちゃった', 1.8);
-          floatText(195, 300, 'パーフェクト ' + e.count + '段!', '#ffe066', 32, 1.6);
+          bigMsg('パーフェクト ' + e.count + '段!', '#ffe066', 32, 1.6, 3);
           G.perfText = null;
           break;
         case 'drop': onDrop(e); break;
@@ -301,7 +320,7 @@
           if (e.block.kind === 'mochi') tip('mochi', 'おもちは 手を休めると もどるよ!');
           break;
         case 'miss':
-          G.swing = 1; sfx('miss'); floatText(195, 470, 'カン!', '#ffffff', 28, 0.6);
+          G.swing = 1; sfx('miss'); if (!bigBusy(2)) floatText(250, 474, 'カン!', '#ffffff', 26, 0.6);
           if (G.S.combo === 0 && G.S.windowDrops > 1) G.comboEnd = G.at + 1;
           if (e.block.kind === 'ring') tip('ring', '輪が まとに 重なったら トン!');
           else tip('slide', '▲が まんなかに 来たら トン!');
@@ -309,14 +328,14 @@
         case 'tooFast': G.swing = 1; sfx('tap'); break;
         case 'tama': floatText(46, 340, '玉 +1', '#ffe066', 20, 1.2); tip('tama', 'ちょっかいを つかってみよう!(下の3つ)'); break;
         case 'item':
-          sfx('item'); floatText(195, 300, D.ITEMS[e.item].name + ' ゲット!', '#fff3a0', 20, 1.4);
+          sfx('item'); bigMsg(D.ITEMS[e.item].name + ' ゲット!', '#fff3a0', 24, 1.3, 2);
           tip('item', e.item === 'shield' ? 'まもり:1回だけ 見つかっても セーフ!' : 'アイテムを ためしてみて!(右の わく)');
           break;
-        case 'itemPoints': floatText(330, 330, '+100', '#fff3a0', 22, 1); break;
+        case 'itemPoints': bigMsg('+100', '#fff3a0', 26, 1.0, 1); break;
         case 'bomb':
           sfx('angry'); burst(195, 480, '#ffb020', 26, 260); burst(195, 480, '#555', 14, 200); G.shake = 0.5; G.flash = 0.7; G.flashCol = '255,200,80';
           if (G.ptsText) { var bi = G.texts.indexOf(G.ptsText); if (bi >= 0) G.texts.splice(bi, 1); }
-          G.ptsText = floatText(250, 474, 'ドカーン!', '#ffb020', 30, 0.9);
+          bigMsg('ドカーン!', '#ffb020', 36, 0.9, 3);
           tip('bomb', 'ばくだんを おとすと びっくりして ふりむくよ!');
           break;
         case 'bombDud': floatText(195, 460, 'ポン', '#ccc', 22, 0.6); break;
@@ -332,18 +351,18 @@
         case 'goldenPop':
           sfx('gpop'); G.pop = { t0: G.at }; G.goldenView = null; G.shake = 0.6; G.flash = 0.9; G.flashCol = '255,230,120';
           for (var cf = 0; cf < 6; cf++) burst(195, 330, ['#ff4a6a', '#ffd84a', '#4ac8ff', '#7ae05a', '#ff9ad0', '#ffffff'][cf], 18, 420);
-          floatText(195, 470, '+' + fmt(e.pts), '#ffe066', 40, 1.6); faceOverride('surprised', 1.8); moodBgm();
+          bigMsg('ドーン! +' + fmt(e.pts), '#ffe066', 40, 1.6, 3); faceOverride('surprised', 1.8); moodBgm();
           break;
-        case 'goldenFlop': sfx('gpshu'); G.flop = { t0: G.at, inflate: e.inflate }; G.goldenView = null; floatText(195, 470, 'ぷしゅ〜 +' + e.pts, '#ffe8a0', 26, 1.4); say('……おしい!', 1.4); moodBgm(); break;
-        case 'korobi': sfx('drop'); G.shake = 0.3; floatText(195, 330, 'ほんとうに ころんだ!', '#9be15d', 28, 1.4); say('あいたたた…', 1.4); break;
+        case 'goldenFlop': sfx('gpshu'); G.flop = { t0: G.at, inflate: e.inflate }; G.goldenView = null; bigMsg('ぷしゅ〜 +' + e.pts, '#ffe8a0', 28, 1.4, 3); say('……おしい!', 1.4); moodBgm(); break;
+        case 'korobi': sfx('drop'); G.shake = 0.3; bigMsg('ほんとうに ころんだ!', '#9be15d', 30, 1.4, 3); say('あいたたた…', 1.4); break;
         case 'getup': sfx('ok'); say('よいしょ! 七転び八起き!', 1.2); break;
-        case 'girigiri': G.slowUntil = G.at + 0.3; sfx('shield'); floatText(195, 380, 'ギリギリ セーフ!!', '#ffe066', 40, 1.3); floatText(250, 430, '+' + C.GIRIGIRI_BONUS, '#ffe066', 22, 1.0); break;
-        case 'kinSoon': floatText(195, 360, 'つぎ 金だるま が 来るよ!', '#ffd84a', 22, 1.6); break;
+        case 'girigiri': G.slowUntil = G.at + 0.3; sfx('shield'); bigMsg('ギリギリ セーフ!! +' + C.GIRIGIRI_BONUS, '#ffe066', 38, 1.3, 4); break;
+        case 'kinSoon': bigMsg('つぎ 金だるま が 来るよ!', '#ffd84a', 22, 1.6, 2); break;
         case 'kinArrive': sfx('gold'); G.flash = 0.5; G.flashCol = '255,220,80'; say('おや? 金色の だるまさん! 点数3倍', 2.0, '#fff3c0'); break;
         case 'kinLeave': say('金だるま、帰っちゃった', 1.6, '#fff3c0'); break;
         case 'saisen': floatText(130, 58, 'おさいせん ' + e.n + '/' + C.SAISEN_WISH, '#ffe066', 16, 1.2); break;
-        case 'saisenWish': sfx('item'); floatText(195, 330, 'おねがい かなった! つぎは 虹の段', '#ffe066', 22, 1.6); break;
-        case 'ippo': sfx('gold'); G.swing = 1; floatText(195, 420, 'いーっぽ!', '#ffe066', 36, 1.0); break;
+        case 'saisenWish': sfx('item'); bigMsg('おねがい かなった! つぎは 虹', '#ffe066', 24, 1.6, 2); break;
+        case 'ippo': sfx('gold'); G.swing = 1; G.ippoText = 0; bigMsg('いーっぽ!', '#ffe066', 40, 1.0, 2); break;
         case 'reactDemo': tip('react', 'ちょっかいを すると こっちを むくよ。そのあいだは トン!しないで'); break;
         case 'out': onOut(); break;
         case 'tutorialDone':
@@ -372,10 +391,10 @@
     var hex = D.BLOCKS[b.t].hex;
     if (e.perfect) {
       if (G.perfText && G.texts.indexOf(G.perfText) >= 0) { G.perfText.text = 'むてき +' + fmt(S.perfPts || 0); G.perfText.t0 = G.at - 0.2; }
-      else { G.perfText = floatText(240, 490, 'むてき +' + fmt(S.perfPts || 0), '#ffe066', 24, 1.0); }
+      else if (!bigBusy(2)) { G.perfText = floatText(240, 490, 'むてき +' + fmt(S.perfPts || 0), '#ffe066', 24, 1.0); }
     } else {
-      if (G.ptsText) { var ix = G.texts.indexOf(G.ptsText); if (ix >= 0) G.texts.splice(ix, 1); }
-      G.ptsText = floatText(250, 474, '+' + fmt(e.pts) + (e.squeeze ? ' すべりこみ!' : ''), e.squeeze ? '#ff7070' : hex, e.pts >= 100 ? 26 : 24, 0.8);
+      if (G.ptsText) { var ix = G.texts.indexOf(G.ptsText); if (ix >= 0) G.texts.splice(ix, 1); G.ptsText = null; }
+      if (!bigBusy(2)) G.ptsText = floatText(250, 474, '+' + fmt(e.pts) + (e.squeeze ? ' すべりこみ!' : ''), e.squeeze ? '#ff7070' : hex, e.pts >= 100 ? 26 : 24, 0.8);
     }
     G.scoreBump = 1;
     if (e.squeeze) tip('squeeze', '赤い字の間に落とすと 1.5倍。でも こわいよ');
@@ -505,10 +524,10 @@
         if (it === 'odateru') { sfx('shy'); psay('かっこいい〜!', 1.2); faceOverride('shy', 1.4); say('え〜?ぼく まるいだけだよ〜?', 1.8, '#ffe0f0'); }
         if (it === 'komoriuta') { sfx('sleepy'); psay('ねんねん ころり〜♪', 1.5); }
         if (it === 'perfect') sfx('perfect');
-        if (it === 'kizuchi') { sfx('gold'); floatText(60, 440, '金の木づち!', '#ffd040', 22, 1.2); }
-        if (it === 'bai') { sfx('gold'); floatText(195, 60, '点数 2倍!', '#ffd040', 26, 1.2); }
-        if (it === 'tokei') { sfx('ring'); floatText(195, 300, 'ピタッ!', '#bfe0ff', 34, 1.0); }
-        if (it === 'perfect') { floatText(195, 300, 'パーフェクト!', '#ff8ac0', 36, 1.4); }
+        if (it === 'kizuchi') { sfx('gold'); bigMsg('金の木づち!', '#ffd040', 30, 1.2, 2); }
+        if (it === 'bai') { sfx('gold'); bigMsg('点数 2倍!', '#ffd040', 30, 1.2, 2); }
+        if (it === 'tokei') { sfx('ring'); bigMsg('ピタッ!', '#bfe0ff', 36, 1.0, 2); }
+        if (it === 'perfect') { bigMsg('パーフェクト!', '#ff8ac0', 36, 1.4, 3); }
       }
       if (e.type === 'noSleep') say('ねられるか!', 1.4, '#ffd0c8');
     });
@@ -1012,7 +1031,9 @@
     var bump = G.scoreBump; G.scoreBump = Math.max(0, bump - 0.08);
     var dbl = S.doubleUntil > S.t;
     text(fmt(S.score), 222, 21, 30 * (1 + bump * 0.12), dbl ? '#ffd040' : '#ffffff', 'center', 900, '#1b1430', 5);
-    text(S.tutorial ? 'れんしゅう' : 'ベスト ' + fmt(G.rec.best), 222, 45, 16, S.tutorial ? '#ffe066' : 'rgba(255,255,255,0.85)', 'center', 800);
+    var gl2 = goalNow(S);
+    if (gl2 && gl2.base > 0 && !gl2.passed) text(gl2.label + 'まで あと' + gl2.left + '段', 222, 45, 16, gl2.key === 'c' ? '#ffb0c0' : '#a8d8ff', 'center', 900);
+    else text(S.tutorial ? 'れんしゅう' : 'ベスト ' + fmt(G.rec.best), 222, 45, 16, S.tutorial ? '#ffe066' : 'rgba(255,255,255,0.85)', 'center', 800);
     // 気分(顔の絵+名前)
     var m = D.MOODS[S.d.mood];
     ctx.fillStyle = m.color; ctx.beginPath(); ctx.arc(28, 72, 19, 0, 6.283); ctx.fill();
@@ -1292,7 +1313,6 @@
     var hp = drawTowerAndHead(S, t);
     drawStatus(S);
     drawLeftColumn(S, t);
-    drawGoal(S);
     drawFlyers(dt);                         // 飛ぶ段は アイテムの枠・ボタンより後ろ
     drawSlots(S, t);
     drawChotto(S, t);
@@ -1303,7 +1323,8 @@
     drawBubbles(hp.headY);
     drawPractice(S, t);
     if (S.golden || G.pop || G.flop) { drawGoldenScene(S); drawTon(S, t); }   // トン!(ふくらませろ!)は いちばん上に
-    if (G.ippoText && G.at < G.ippoText) { var ia = Math.min(1, (G.ippoText - G.at) / 0.4); ctx.save(); ctx.globalAlpha = ia; text('はじめの… いーっぽ!', 195, 400, 34, '#ffe066', 'center', 900, '#1b1430', 7); ctx.restore(); }
+    if (G.ippoText && G.at < G.ippoText && !bigBusy(1)) { var ia = Math.min(1, (G.ippoText - G.at) / 0.4); ctx.save(); ctx.globalAlpha = ia; text('はじめの… いーっぽ!', BIG_X, BIG_Y, 26, '#ffe066', 'center', 900, '#1b1430', 7); ctx.restore(); }
+    drawBig();
     drawVignette(S, t);
     drawMystery();
     ctx.restore();
@@ -1442,10 +1463,10 @@
       G.backNetaAt = G.at + 12 + G.lastRng() * 10;
     }
     var scn = D.sceneOf(S.dropped).idx;
-    if (G.sceneIdx != null && scn > G.sceneIdx) floatText(195, 300, D.SCENES[scn][2] + ' に なった!', '#ffffff', 24, 1.6);
+    if (G.sceneIdx != null && scn > G.sceneIdx) bigMsg(D.SCENES[scn][2] + ' に なった!', '#ffffff', 26, 1.6, 2);
     G.sceneIdx = scn;
     var gl = goalNow(S);
-    if (gl && gl.passed && !G.goalPassed[gl.key]) { G.goalPassed[gl.key] = true; if (gl.base > 0) { sfx('combo'); floatText(195, 360, gl.key === 'c' ? '挑戦状 クリア!' : '最高 こえた!', '#9be15d', 30, 1.6); } }
+    if (gl && gl.passed && !G.goalPassed[gl.key]) { G.goalPassed[gl.key] = true; if (gl.base > 0) { sfx('combo'); bigMsg(gl.key === 'c' ? '挑戦状 クリア!' : '最高 こえた!', '#9be15d', 32, 1.6, 2); } }
     handle(D.step(S, dt));
     for (var i = 0; i < S.tower.length; i++) if (S.tower[i].flash) S.tower[i].flash = Math.max(0, S.tower[i].flash - dt * 6);
     // はじめての段は 1回だけ説明する

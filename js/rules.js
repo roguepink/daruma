@@ -53,8 +53,8 @@
     KIN_EVERY: 50, KIN_CYCLES: 3,                                               // 金だるま(使っていない)
     GOLDEN_P: 0.10, GOLDEN_P_AGAIN: 0.04, GOLDEN_SEC: 7, GOLDEN_TAP: 0.06, GOLDEN_DECAY: 0.12, GOLDEN_POINTS: 600, GOLDEN_SPEED_BONUS: 40, GOLDEN_FLOP_POINTS: 50, GOLDEN_AFTER: 1.5,   // ゴールデンだるま
     BOUSAN_P: 0.08, SAISEN_WISH: 5, RENDA_TITLE: 15, IPPO_DROPS: 3,
-    REACT_PRE: 0.40, REACT_GRACE: 0.25,   // 「!?」+ 猶予 = 0.65 秒(フェアさの基準 0.63 秒より長く)
-    REACT_WATCH: 1.2, REACT_DEMO_PRE: 1.0, TSUNTSUN_JOY_P: 0.15, FACE_COMMON_P: 0.10, FACE_RARE_P: 0.025,
+    REACT_PRE: 0.60, REACT_GRACE: 0.25,   // 「!?」+ 猶予 = 0.85 秒(ふつうの予兆と同じくらい。ちょっかいが 損に なりすぎないように)
+    REACT_WATCH: 0.8, REACT_SAFE_MIN: 2.5, REACT_DEMO_PRE: 1.0, TSUNTSUN_JOY_P: 0.15, FACE_COMMON_P: 0.10, FACE_RARE_P: 0.025,
     MYSTERY_REVEAL: 1.0, MUTEKI_SEC: 5, GEKIDO_SEC: [8, 10], MYSTERY_MUTEKI_P: 0.5,
     PERFECT_SEC: 5, PERFECT_DROP_RATE: 3.5, PERFECT_TAP_DROPS: 2, HENGAO_COOLDOWN: 12, TICKLE_MOOD_CYCLES: 1, TIMESTOP_SEC: 3, DOUBLE_SCORE_SEC: 10, GOLD_MALLET_HITS: 6,
     // 演出
@@ -489,7 +489,17 @@
     push('GRACE', CONFIG.REACT_GRACE);
     push('WATCH', CONFIG.REACT_WATCH).face = face;
     push('RETURN', CONFIG.RETURN_DUR);
+    var first = d.ph.length;
     addCycle(S, t0, 0);
+    // 戻ってから 次の振り向き(予兆)まで 最低 2.5秒(ちょっかいが 損に なりすぎないように)
+    for (var i = first; i < d.ph.length; i++) {
+      var pk = d.ph[i].k;
+      if (pk === 'WARN' || pk === 'FEINT' || pk === 'KOROBI') {
+        var lack = CONFIG.REACT_SAFE_MIN - (d.ph[i].s - t0);
+        if (lack > 0) { shiftAfter(d, first, lack); d.ph.splice(first, 0, { k: 'PAUSE', s: t0, e: t0 + lack, L: [], cy: d.cy }); }
+        break;
+      }
+    }
     return { type: 'react', face: face, kind: kind };
   }
   // ばくだん: 向こう向きなら、今から最短の予兆で振り向く
