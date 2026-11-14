@@ -68,6 +68,15 @@
     kusuguru: ['ひゃははは!', 'くすくす… やめて〜', 'こしょばい〜!'], uke: ['あはは! いまの もう1回 言って', 'ぶははっ!', 'お腹 いたい〜'],
     flop: ['さむっ… お茶 ちょうだい', '……つまんない', 'しーん…'], bored: ['もう きかないよ〜', 'またそれ〜?'], demo: ['つんつん されると こっちを むくよ!']
   };
+  var WATCH_NETA = {
+    any: ['…じーっ(目が かわいてきた)', 'まばたき がまん…', 'きみの うしろに なにか いる… うそ', 'いま 動いた? 動いてないね?', 'にらめっこ なら まけないよ'],
+    okori: ['ぜったい 見のがさないぞ', 'まだかな〜 ぷんぷん'], gekido: ['ゴゴゴゴ…'], nemui: ['ねむ… いや 見てる 見てる'], ijiwaru: ['つぎは いつ ふりむこうかな〜'], gokigen: ['ふんふふ〜ん♪'], tere: ['あんまり 見ないで…']
+  };
+  var BACK_NETA = {
+    any: ['みかん おいしい…', 'ふんふふ〜ん♪', 'ぼくの スマホ どこ?… 手が なかった', '背中 かゆい… 手が とどかない というか 手が ない', 'ハ…ハ…ハックション!', 'ふぁ〜あ'],
+    okori: ['ぶつぶつ… ぶつぶつ…'], nemui: ['むにゃ… おもち…'], ijiwaru: ['ひひひ… いつ ふりむこうかな'], gokigen: ['きょうは いい日だな〜'], nakisou: ['ぐすん… さみしい']
+  };
+  function netaOf(T, mood) { var a = (T[mood] || []).concat(T.any); return a[Math.floor(G.lastRng() * a.length)]; }
   function seeFace(id) { if (!id) return; if (!G.sessionFaces) G.sessionFaces = {}; G.sessionFaces[id] = true; }
 
   // ------------------------------------------------------------------ 画面の配置(design.md 1 章)
@@ -106,6 +115,7 @@
   }
 
   // ------------------------------------------------------------------ 全体の状態
+  var CHALLENGE = (function () { try { var c = parseInt(new URLSearchParams(location.search).get('c'), 10); return c > 0 && c < 100000 ? c : 0; } catch (e) { return 0; } })();
   var today = (function () { var d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); })();
   var G = window.G = {
     mode: 'title', S: null, paused: false, countdown: 0, at: 0, acc: 0, lastNow: 0,
@@ -141,8 +151,10 @@
   function toTitle() {
     refreshRecords();
     G.mode = 'title'; G.paused = false; hideAll(); show('title', true);
-    $('tBest').textContent = G.rec.best ? 'ベスト ' + fmt(G.rec.best) + ' 点 / 最高 ' + G.rec.bestDan + ' 段' : 'はじめての挑戦!';
-    $('tDaily').textContent = '今日のだるまさん\n' + G.daily.line;
+    var rk = D.rankOf(G.rec.stats.totalDan || 0);
+    $('tBest').textContent = (G.rec.best ? 'ベスト ' + fmt(G.rec.best) + '点 / ' : '') + '段位 ' + rk.name + (rk.next ? '(' + rk.next + 'まで あと' + rk.toNext + '段)' : '');
+    if (false) $('tBest').textContent = G.rec.best ? 'ベスト ' + fmt(G.rec.best) + ' 点 / 最高 ' + G.rec.bestDan + ' 段' : 'はじめての挑戦!';
+    $('tDaily').textContent = CHALLENGE ? 'ともだちから 挑戦状!\n' + CHALLENGE + '段を こえろ!' : '今日のだるまさん\n' + G.daily.line;
     AUDIO.bgm('title');
   }
   function toHowto() { G.mode = 'howto'; G.howtoPage = 0; hideAll(); show('howto', true); setHowto(); }
@@ -180,6 +192,7 @@
     G.S = D.newGame({ seed: seed, tutorial: tutorial, firstPlay: G.rec.stats.plays === 0, daily: G.daily.mood });
     G.mode = 'play'; G.paused = false; G.countdown = 0; G.acc = 0;
     G.fx = []; G.flyers = []; G.texts = []; G.bubble = null; G.pbubble = null; G.tip = null; G.flash = 0; G.shake = 0; G.fall = 0;
+    G.goalPassed = {}; G.goalBestDan = G.rec.bestDan; G.sceneIdx = null; G.netaAt = null; G.backNetaAt = 0; G.ippoText = G.at + 1.6;
     G.chantAt = []; G.faceOver = null; G.sessionFaces = {}; G.faceTag = null; G.outInfo = null; G.tapX = null; G.comboEnd = 0;
     if (tutorial) { say('れんしゅう だよ!むこうを むいたら トン!', 3); }
     AUDIO.bgm('play');
@@ -234,6 +247,7 @@
           if (e.i === 0) G.chantAt = [];
           G.chantAt[e.i] = G.at;
           if (e.ph && e.ph.dbl) { sfx('voicelast'); break; }
+          if (e.ph && e.ph.alt && e.i === 5) { sfx('flop'); floatText(HEAD.x - 40, (G.headY || 230) + 40, 'ぷっ', '#c8a070', 24, 0.9); }
           if (e.i <= 5) sfx('voice');
           else if (e.i <= 8) sfx('warn');
           else sfx('voicelast');
@@ -252,6 +266,8 @@
             sfx(e.ph.react === 'tsuntsun' ? 'angry' : e.ph.react === 'flop' || e.ph.react === 'bored' ? 'flop' : 'laugh');
           } else if (e.k === 'WATCH') {
             if (!blind) seeFace(faceIdOfArt(D.MOODS[S.d.mood].art));
+            if (!blind && e.ph.alt) { faceOverride('shy', 1.6); setTimeout(function () { say('…いまの ぼくじゃ ないよ', 1.4, '#ffe0f0'); }, 150); }
+            else if (!blind && e.ph.e - e.ph.s >= 1.4 && G.lastRng() < 0.5) G.netaAt = { at: G.at + 0.55, ph: e.ph, text: netaOf(WATCH_NETA, S.d.mood) };
             if (!blind) { G.flash = 1; G.flashCol = '255,40,40'; G.shake = 0.35; floatText(HEAD.x + 104, 196, 'じーっ', '#ff4040', 24, 0.8); if (S.tutorial) say('見てるよ〜 さわらないでね', 1.4); }
             else { G.blindWatches = (G.blindWatches || 0) + 1; say(G.blindWatches >= 2 && G.lastRng() < 0.6 ? 'むむっ…木の においが する…!' : 'あれ?見えないよ〜', 1.6, '#e6dcff'); }
           }
@@ -308,6 +324,15 @@
           sfx('shield'); say('あれ?気のせいかな〜?', 1.8, '#e6dcff'); burst(195, 240, '#d8f4ff', 30, 240); G.flash = 0.6; G.flashCol = '200,240,255';
           break;
         case 'react': break;
+        case 'korobi': sfx('drop'); G.shake = 0.3; floatText(195, 330, 'ほんとうに ころんだ!', '#9be15d', 28, 1.4); say('あいたたた…', 1.4); break;
+        case 'getup': sfx('ok'); say('よいしょ! 七転び八起き!', 1.2); break;
+        case 'girigiri': G.slowUntil = G.at + 0.3; sfx('shield'); floatText(195, 380, 'ギリギリ セーフ!!', '#ffe066', 40, 1.3); floatText(250, 430, '+' + C.GIRIGIRI_BONUS, '#ffe066', 22, 1.0); break;
+        case 'kinSoon': floatText(195, 360, 'つぎ 金だるま が 来るよ!', '#ffd84a', 22, 1.6); break;
+        case 'kinArrive': sfx('gold'); G.flash = 0.5; G.flashCol = '255,220,80'; say('おや? 金色の だるまさん! 点数3倍', 2.0, '#fff3c0'); break;
+        case 'kinLeave': say('金だるま、帰っちゃった', 1.6, '#fff3c0'); break;
+        case 'saisen': floatText(130, 58, 'おさいせん ' + e.n + '/' + C.SAISEN_WISH, '#ffe066', 16, 1.2); break;
+        case 'saisenWish': sfx('item'); floatText(195, 330, 'おねがい かなった! つぎは 虹の段', '#ffe066', 22, 1.6); break;
+        case 'ippo': sfx('gold'); G.swing = 1; floatText(195, 420, 'いーっぽ!', '#ffe066', 36, 1.0); break;
         case 'reactDemo': tip('react', 'ちょっかいを すると こっちを むくよ。そのあいだは トン!しないで'); break;
         case 'out': onOut(); break;
         case 'tutorialDone':
@@ -361,7 +386,9 @@
     var prevBest = r.best;
     if (isBest) r.best = st.score;
     if (isBestDan) r.bestDan = st.dan;
+    var rankBefore = D.rankOf(r.stats.totalDan || 0);
     r.stats.plays++; r.stats.totalDan += st.dan;
+    var rankAfter = D.rankOf(r.stats.totalDan);
     r.stats.dajareUke += st.counts.dajareUke; r.stats.hengaoOK += st.counts.hengaoOK;
     st.seen.forEach(function (f) { if (r.stats.faces.indexOf(f) < 0) r.stats.faces.push(f); });
     if (!r.stats.faceIds) r.stats.faceIds = [];
@@ -381,17 +408,20 @@
     $('rScore').textContent = fmt(st.score) + ' 点';
     $('rBest').textContent = isBest ? '★ ベスト更新!' : 'ベストまで あと ' + fmt(r.best - st.score) + ' 点';
     $('rBest').classList.toggle('best', isBest);
-    $('rWin').textContent = '1回の 向こう向きで いちばん多く: ' + st.bestWindow + 'こ';
-    $('rStats').textContent = 'コンボ ' + st.bestCombo + ' / すべりこみ ' + st.squeezes + ' / ' + Math.floor(st.time / 60) + '分' + Math.floor(st.time % 60) + '秒';
+    $('rWin').textContent = '1回で いちばん多く ' + st.bestWindow + 'こ / ' + st.scene.name + 'まで 行けた!';
+    $('rStats').textContent = 'コンボ ' + st.bestCombo + ' / ギリギリ ' + (st.counts.girigiri || 0) + ' / 金だるま ' + (S.kinDone || 0) + ' / ' + Math.floor(st.time / 60) + '分' + Math.floor(st.time % 60) + '秒';
     var nextT = null; for (var ti = 0; ti < D.TITLES.length; ti++) if (r.stats.titles.indexOf(D.TITLES[ti].id) < 0) { nextT = D.TITLES[ti]; break; }
     $('rNext').textContent = nextT ? 'つぎの称号: ' + nextT.name + '(' + nextT.how + ')' : '称号を ぜんぶ とったよ!';
     $('rToast').textContent = '';
-    G.shareText = 'こっち見ないで!だるま落とし で ' + st.dan + '段 おとしたよ(' + fmt(st.score) + '点)。きみは なん段?';
+    G.shareText = 'こっち見ないで!だるま落とし で ' + st.dan + '段 おとしたよ。この段数を こえられる?' + (CHALLENGE ? (st.dan > CHALLENGE ? '(挑戦状 ' + CHALLENGE + '段に かったよ!)' : '') : '');
+    G.shareDan = st.dan;
     ['btnAgain', 'btnShare', 'btnToTitle'].forEach(function (id) { $(id).disabled = true; });
     setTimeout(function () { ['btnAgain', 'btnShare', 'btnToTitle'].forEach(function (id) { $(id).disabled = false; }); }, 800);   // 連打の指で うっかり押さないように
     var tl = got.map(function (id) { for (var i = 0; i < D.TITLES.length; i++) if (D.TITLES[i].id === id) return D.TITLES[i]; }).filter(Boolean);
     var showT = news.length ? tl.filter(function (x) { return news.indexOf(x.id) >= 0; }) : tl.slice(-1);
-    $('rTitle').textContent = news.length ? '称号: ' + showT.map(function (x) { return x.name; }).join('・') + ' (NEW)' : (nextT ? 'つぎの称号: ' + nextT.name + '(' + nextT.how + ')' : '称号を ぜんぶ とったよ!');
+    var rankLine = rankAfter.idx > rankBefore.idx ? '祝・' + rankAfter.name + '!(段位アップ)' : '段位 ' + rankAfter.name + (rankAfter.next ? '(あと' + rankAfter.toNext + '段で ' + rankAfter.next + ')' : '');
+    $('rTitle').textContent = news.length ? '称号: ' + showT.map(function (x) { return x.name; }).join('・') + '(NEW) / ' + rankLine : rankLine;
+    if (false) $('rTitle').textContent = news.length ? '称号: ' + showT.map(function (x) { return x.name; }).join('・') + ' (NEW)' : (nextT ? 'つぎの称号: ' + nextT.name + '(' + nextT.how + ')' : '称号を ぜんぶ とったよ!');
     $('rNext').textContent = '';
     $('rFaces').textContent = '見たかお ' + countSeen() + ' / ' + faceList().length + (newFaces.length ? '   NEW ' + newFaces.length : '');
     $('rGridBox').scrollTop = 0;
@@ -524,7 +554,7 @@
     if (!ev || !ev.isTrusted) return;
     try { var el = document.documentElement, fs = el.requestFullscreen || el.webkitRequestFullscreen; var pr = fs && fs.call(el); if (pr && pr.catch) pr.catch(function () {}); } catch (e) {}
   }
-  function onPlayButton(ev) { fullscreen(ev); sfx('ok'); if (!G.rec.tutorialDone && G.rec.stats.plays === 0) toHowto(); else startGame(); }
+  function onPlayButton(ev) { fullscreen(ev); sfx('ok'); startGame(); }   // はじめての人も 説明を とばして すぐ練習(説明は「あそびかた」から)
   bindBtn('btnPlay', onPlayButton);
   bindBtn('btnHow', function () { sfx('tap'); toHowto(); });
   bindBtn('btnZukan', function () { sfx('tap'); toZukan(); });
@@ -544,7 +574,7 @@
     setTimeout(function () { b.dataset.armed = ''; b.textContent = 'やめる'; }, 3000);
   });
   bindBtn('btnShare', function () {
-    var url = location.origin + location.pathname, txt = G.shareText || 'こっち見ないで!だるま落とし';
+    var url = location.origin + location.pathname + (G.shareDan ? '?c=' + G.shareDan : ''), txt = G.shareText || 'こっち見ないで!だるま落とし';   // 挑戦状: 段数だけを アドレスに(名前は 入れない)
     if (navigator.share) { navigator.share({ title: 'こっち見ないで!だるま落とし', text: txt, url: url }).catch(function () {}); return; }
     var done = function () { $('rToast').textContent = 'アドレスを コピーしたよ。LINE に はりつけてね'; };
     try { navigator.clipboard.writeText(txt + ' ' + url).then(done, function () { $('rToast').textContent = url; }); } catch (e) { $('rToast').textContent = url; }
@@ -627,6 +657,17 @@
 
   // ------------------------------------------------------------------ 描画(遊んでいる画面)
   function themeFor(mood) { return mood === 'okori' || mood === 'gekido' ? 'yuyake' : mood === 'nemui' ? 'yoru' : 'washitsu'; }
+  var SCENE_LOOK = { asa: ['washitsu', 'rgba(255,225,190,0.18)'], hiru: ['washitsu', null], yuyake: ['yuyake', null], yoru: ['yoru', null], goraiko: ['yuyake', 'rgba(255,200,120,0.28)'] };
+  function drawScene(dan, mood, h) {
+    var sc = D.sceneOf(dan), look = SCENE_LOOK[sc.id];
+    safeDraw('drawBackground', [ctx, W, h, G.at, look[0]]);
+    if (look[1]) { ctx.save(); ctx.fillStyle = look[1]; ctx.fillRect(0, 0, W, h); ctx.restore(); }
+    if (sc.id === 'goraiko') {   // ご来光: 光の すじ
+      ctx.save(); var g = ctx.createRadialGradient(330, 150, 10, 330, 150, 260); g.addColorStop(0, 'rgba(255,240,170,0.75)'); g.addColorStop(1, 'rgba(255,200,120,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, h); ctx.restore();
+    }
+    var mt = mood === 'okori' ? 'rgba(255,60,30,0.14)' : mood === 'gekido' ? 'rgba(150,0,0,0.22)' : mood === 'nemui' ? 'rgba(60,90,200,0.16)' : mood === 'kin' ? 'rgba(255,215,80,0.18)' : null;
+    if (mt) { ctx.save(); ctx.fillStyle = mt; ctx.fillRect(0, 0, W, h); ctx.restore(); }
+  }
 
   function drawTowerAndHead(S, t, opt) {
     opt = opt || {};
@@ -664,8 +705,18 @@
     if (pose.k === 'PERFECT' || G.mode === 'out') { /* そのまま */ }
     var peeking = S.peek && t >= S.peek.s && t < S.peek.e && pose.k === 'SAFE';
     var hopts = { turn: opt.turn != null ? opt.turn : pose.turn, mood: opt.mood || pose.mood, t: G.at, shake: pose.shake, dir: peeking ? -1 : 1 };
+    // ほんとうに ころんだ: 足もとを 中心に 横へ ころん → よいしょ と起き上がる
+    var fall = 0, kph = D.phaseAt(S.d, t);
+    if (kph && kph.k === 'KOROBI') fall = 1.45 * Math.min(1, (t - kph.s) / 0.25) + Math.sin(G.at * 9) * 0.04;
+    else if (kph && kph.getup) { var gq = (t - kph.s) / (kph.e - kph.s); fall = 1.45 * (1 - gq) - Math.sin(gq * Math.PI) * 0.15; }
+    var hop = G.hop && G.at - G.hop < 0.3 ? -Math.sin((G.at - G.hop) / 0.3 * Math.PI) * 14 : 0;
+    ctx.save();
+    if (fall) { var px = HEAD.x, py = hy + size * headBottom(); ctx.translate(px + size * 0.4, py); ctx.rotate(fall); ctx.translate(-px - size * 0.4, -py); hopts.turn = 0; }
+    if (hop) ctx.translate(0, hop);
     if (pose.face && !opt.mood) drawFaceById(ctx, HEAD.x, hy, size, pose.face, { turn: hopts.turn, t: G.at, dir: 1 });
+    else if (S.d.mood === 'kin' && !pose.blind) drawGoldHead(HEAD.x, hy, size, hopts);
     else safeDraw('drawHead', [ctx, HEAD.x, hy, size, hopts]);
+    ctx.restore();
     if (pose.face && G.faceTag && G.at < G.faceTag.until && G.faceTag.name) {   // 反応の顔の名前
       var ty = Math.max(156, hy - 74);
       ctx.save(); ctx.fillStyle = 'rgba(255,240,200,0.96)'; rr(70, ty - 16, 124, 32, 10); ctx.fill(); ctx.strokeStyle = '#c08a20'; ctx.lineWidth = 2; ctx.stroke(); ctx.restore();
@@ -715,6 +766,20 @@
       if (M.result === 'muteki') { text('むてき!', x, y - 60, 48 * (0.6 + 0.4 * sc), '#ffd84a', 'center', 900, '#1b1430', 8); text('5びょう 見られても セーフ', x, y + 120, 18, '#ffffff', 'center', 900, '#1b1430', 5); }
       else { safeDraw('drawHead', [ctx, x, y - 66, 110 * (0.6 + 0.4 * sc), { turn: 1, mood: 'angry', t: G.at, shadow: false }]); text('げきおこ!!', x, y + 112, 30, '#ff3030', 'center', 900, '#ffffff', 6); text('点数3倍・すぐ ふりむく', x, y + 146, 18, '#ffffff', 'center', 900, '#1b1430', 5); }
     }
+  }
+  var goldCv = null;
+  function drawGoldHead(x, y, size, hopts) {
+    var sc = Math.max(1, VIEW.s * VIEW.dpr), pad = size * 0.9, w = Math.ceil(pad * 2 * sc);
+    if (!goldCv) goldCv = document.createElement('canvas');
+    if (goldCv.width !== w) { goldCv.width = w; goldCv.height = w; }
+    var c = goldCv.getContext('2d');
+    c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, w, w); c.setTransform(sc, 0, 0, sc, 0, 0);
+    try { art('drawHead')(c, pad, pad, size, hopts); } catch (e) { FB.drawHead(c, pad, pad, size, hopts); }
+    c.globalCompositeOperation = 'source-atop';
+    var g = c.createLinearGradient(0, 0, pad * 2, pad * 2); g.addColorStop(0, 'rgba(255,245,170,0.62)'); g.addColorStop(0.5, 'rgba(240,190,40,0.62)'); g.addColorStop(1, 'rgba(190,130,10,0.62)');
+    c.fillStyle = g; c.fillRect(0, 0, pad * 2, pad * 2); c.globalCompositeOperation = 'source-over';
+    ctx.drawImage(goldCv, x - pad, y - pad, pad * 2, pad * 2);
+    for (var i = 0; i < 4; i++) { var a = G.at * 1.3 + i * 1.57; text('✦', x + Math.cos(a) * size * 0.62, y - size * 0.1 + Math.sin(a) * size * 0.5, 16, '#fff6b0', 'center', 900); }
   }
   function drawFuse(cy) {
     ctx.save();
@@ -785,6 +850,7 @@
         for (i = 0; i < 2; i++) { u = (a * 0.8 + i * 0.5) % 1; ctx.globalAlpha = 1 - u; ctx.fillStyle = '#7fd6ff'; ctx.beginPath(); ctx.ellipse(x + (i ? 78 : -78), top + 60 + u * 40, 5, 8, 0, 0, 6.283); ctx.fill(); }
         ctx.globalAlpha = 1; text('ぐすん', x + 92, top + 22, 17, '#7fd6ff', 'center', 900, '#1b1430', 4); break;
       case 'tere': for (i = 0; i < 2; i++) { u = (a * 0.5 + i * 0.5) % 1; ctx.globalAlpha = 1 - u; heart(x + (i ? 86 : -86), top + 50 - u * 40, 24, '#ff6f9f'); } break;
+      case 'kin': text('キラキラ', x + 92, top + 24 + Math.sin(a * 3) * 3, 18, '#ffe066', 'center', 900, '#7a5000', 4); break;
       case 'gekido':
         for (i = 0; i < 5; i++) { u = (a * 1.6 + i / 5) % 1; ctx.globalAlpha = 0.9 * (1 - u); ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(x + (i - 2) * 26, top + 12 - u * 44, 9 + u * 12, 0, 6.283); ctx.fill(); }
         ctx.globalAlpha = 1; text('ゴゴゴ', x + 92 + Math.sin(a * 30) * 2, top + 26, 20, '#ff1a1a', 'center', 900, '#1b0000', 5); break;
@@ -823,6 +889,8 @@
       ctx.restore(); return;
     }
     if (k === 'STOP') { text('時間が とまってる… いまのうち!', 195, 117, 19, '#3a6ab8', 'center', 900); ctx.restore(); return; }
+    if (k === 'KOROBI') { text('ころん… ほんとに ころんだ!', 195, 117, 22, '#2a8a20', 'center', 900); ctx.restore(); return; }
+    var CH = ph && ph.alt ? C.CHANT_BOUSAN : C.CHANT;
     var said = D.chantIndex(S.d, t);
     if (said === 0 && (k === 'FROZEN' || k === 'PAUSE')) said = G.lastSaid || 0;
     else G.lastSaid = said;
@@ -832,7 +900,7 @@
       var at = G.chantAt[i], pop = done && at != null ? Math.max(0, 1 - (G.at - at) / 0.18) : 0;
       var size = (red ? 30 : 26) * (1 + 0.45 * pop);
       var col = done ? (red ? (blind ? '#8a5ad8' : '#e02020') : '#1b1430') : 'rgba(27,20,48,0.22)';
-      text(C.CHANT[i], x, 117, size, col, 'center', 900);
+      text(CH[i], x, 117, size, col, 'center', 900);
     }
     if (ph && ph.react && (k === 'WARN' || k === 'GRACE' || k === 'WATCH')) text('!?', 195, 117, 34, blind ? '#8a5ad8' : '#e02020', 'center', 900, '#fffaf0', 6);
     if (ph && ph.dbl) text('…だっ!', 195, 117, 34, blind ? '#8a5ad8' : '#e02020', 'center', 900, '#fffaf0', 6);
@@ -882,7 +950,7 @@
       for (var i = 6; i < 10; i++) {
         if (said <= i) break;
         var at = G.chantAt[i], pop = at != null ? Math.max(0, 1 - (G.at - at) / 0.2) : 0;
-        text(C.CHANT[i], 46, 192 + (i - 6) * 46, 44 * (1 + 0.5 * pop), col, 'center', 900, '#ffffff', 7);
+        text((ph && ph.alt ? C.CHANT_BOUSAN : C.CHANT)[i], 46, 192 + (i - 6) * 46, 44 * (1 + 0.5 * pop), col, 'center', 900, '#ffffff', 7);
       }
     } else if (ph && ph.react && (k === 'WARN' || k === 'GRACE')) {
       text('!?', 46, 230, 48, blind ? '#9a6af0' : '#ff2a2a', 'center', 900, '#ffffff', 7);
@@ -898,6 +966,19 @@
       }
     }
     if (G.at < G.comboEnd) text('コンボ おしまい', 195, 150, 16, '#dddddd', 'center', 800, '#1b1430', 4);
+  }
+  // 目標の旗: 挑戦状 か 自分の最高段数
+  function goalNow(S) {
+    if (S.tutorial) return null;
+    if (CHALLENGE && !G.goalPassed.c) return { key: 'c', base: CHALLENGE, left: CHALLENGE - S.dropped + 1, passed: S.dropped > CHALLENGE, label: '挑戦状' };
+    var b = G.goalBestDan || 0;
+    return { key: 'b', base: b, left: b - S.dropped + 1, passed: S.dropped > b, label: '最高' };
+  }
+  function drawGoal(S) {
+    var gl = goalNow(S); if (!gl || gl.base <= 0 || gl.passed) return;
+    ctx.save(); ctx.fillStyle = gl.key === 'c' ? 'rgba(200,40,60,0.9)' : 'rgba(30,90,180,0.88)'; rr(304, 290, 80, 52, 10); ctx.fill(); ctx.restore();
+    text(gl.label + 'まで', 344, 304, 16, '#ffffff', 'center', 900);
+    text('あと' + gl.left + '段', 344, 327, 17, '#ffe066', 'center', 900);
   }
   function drawSpeaker(x, y, off) {
     ctx.save(); ctx.fillStyle = '#fff';
@@ -915,6 +996,7 @@
     if (S.shield > 0) items.push(['まもり', '', '#3aa0c8']);
     if (S.mutekiUntil > S.t) items.push(['むてき', S.mutekiUntil > S.t + 99 ? '' : Math.ceil(S.mutekiUntil - S.t) + '', '#d8a010']);
     if (S.d.mood === 'gekido') items.push(['×3', '', '#c01010']);
+    if (S.d.mood === 'kin') items.push(['金 ×3', '', '#c89010']);
     for (var i = 0; i < items.length; i++) {
       var it = items[i];
       ctx.save(); ctx.fillStyle = it[2]; ctx.globalAlpha = 0.95; rr(3, y, 88, 28, 14); ctx.fill(); ctx.restore();
@@ -987,6 +1069,7 @@
     var k = D.kindAt(S.d, t), blind = D.isBlind(S, t);
     if (midWarn(S, t)) return blind ? 'blind' : 'warn';
     if (k === 'PERFECT') return 'perfect';
+    if (k === 'KOROBI') return 'korobi';
     if (D.isDanger(k) || k === 'FEINT') {
       if (blind) return 'blind';
       if (t < S.mutekiUntil) return 'muteki';
@@ -1004,6 +1087,7 @@
     else if (st === 'watch') { fill = '#e5221b'; label = 'さわらないで!'; col = '#ffffff'; border = '#7a0000'; bw = 6; }
     else if (st === 'blind') { fill = '#c9b6f2'; label = '見えてないよ'; }
     else if (st === 'muteki') { fill = '#ffd84a'; label = 'むてき!'; border = '#a06000'; bw = 6; }
+    else if (st === 'korobi') { fill = '#b8f070'; label = 'いまだ!連打!'; grow = pulse * 3; }
     else if (st === 'wait') { fill = '#9a94a8'; label = 'まってね'; }
     else {   // パーフェクト: 桃と金(赤には しない)
       var gg = ctx.createLinearGradient(r.x, 0, r.x + r.w, 0), sh = (G.at * 0.6) % 1;
@@ -1114,7 +1198,7 @@
     var sh = G.shake > 0 ? G.shake * 8 : 0;
     ctx.save();
     if (sh) ctx.translate((Math.random() - 0.5) * sh, (Math.random() - 0.5) * sh);
-    safeDraw('drawBackground', [ctx, W, BG_H, G.at, themeFor(S.d.mood)]);
+    drawScene(S.dropped, S.d.mood, BG_H);
     if (D.kindAt(S.d, t) === 'PERFECT') {
       ctx.save(); ctx.globalAlpha = 0.22;
       var g = ctx.createLinearGradient(0, 0, W, H);
@@ -1126,6 +1210,7 @@
     var hp = drawTowerAndHead(S, t);
     drawStatus(S);
     drawLeftColumn(S, t);
+    drawGoal(S);
     drawFlyers(dt);                         // 飛ぶ段は アイテムの枠・ボタンより後ろ
     drawSlots(S, t);
     drawChotto(S, t);
@@ -1135,6 +1220,7 @@
     drawFx(dt);
     drawBubbles(hp.headY);
     drawPractice(S, t);
+    if (G.ippoText && G.at < G.ippoText) { var ia = Math.min(1, (G.ippoText - G.at) / 0.4); ctx.save(); ctx.globalAlpha = ia; text('はじめの… いーっぽ!', 195, 400, 34, '#ffe066', 'center', 900, '#1b1430', 7); ctx.restore(); }
     drawVignette(S, t);
     drawMystery();
     ctx.restore();
@@ -1147,7 +1233,7 @@
 
   function drawOut(dt) {
     var S = G.S, t = S.out.t, ot = G.outT;
-    safeDraw('drawBackground', [ctx, W, BG_H, G.at, themeFor(G.outInfo.mood)]);
+    drawScene(G.S.dropped, G.outInfo.mood, BG_H);
     drawPanel();
     var z = Math.max(0, Math.min(1, (ot - C.OUT_FREEZE) / 0.35));
     var ez = z * z * (3 - 2 * z);
@@ -1260,6 +1346,19 @@
   // ------------------------------------------------------------------ ループ(固定 1/60 秒)
   function update(dt) {
     var S = G.S;
+    var nowPh = D.phaseAt(S.d, S.t);
+    if (G.netaAt && G.at >= G.netaAt.at) { if (nowPh === G.netaAt.ph && !(G.bubble && G.at < G.bubble.until)) say(G.netaAt.text, 1.0); G.netaAt = null; }
+    if (!G.backNetaAt) G.backNetaAt = G.at + 10 + G.lastRng() * 10;
+    if (G.at >= G.backNetaAt && nowPh && nowPh.k === 'SAFE' && nowPh.e - S.t > 1.6 && D.chantIndex(S.d, S.t) <= 3 && !(G.bubble && G.at < G.bubble.until) && !S.peek) {
+      var bn = netaOf(BACK_NETA, S.d.mood); say(bn, 1.4);
+      if (/ハックション/.test(bn)) G.hop = G.at + 0.6;
+      G.backNetaAt = G.at + 12 + G.lastRng() * 10;
+    }
+    var scn = D.sceneOf(S.dropped).idx;
+    if (G.sceneIdx != null && scn > G.sceneIdx) floatText(195, 300, D.SCENES[scn][2] + ' に なった!', '#ffffff', 24, 1.6);
+    G.sceneIdx = scn;
+    var gl = goalNow(S);
+    if (gl && gl.passed && !G.goalPassed[gl.key]) { G.goalPassed[gl.key] = true; if (gl.base > 0) { sfx('combo'); floatText(195, 360, gl.key === 'c' ? '挑戦状 クリア!' : '最高 こえた!', '#9be15d', 30, 1.6); } }
     handle(D.step(S, dt));
     for (var i = 0; i < S.tower.length; i++) if (S.tower[i].flash) S.tower[i].flash = Math.max(0, S.tower[i].flash - dt * 6);
     // はじめての段は 1回だけ説明する
@@ -1287,7 +1386,7 @@
           G.countdown -= dt;
           if (G.countdown <= 0) { G.countdown = 0; D.refreshTell(G.S, G.S.t); moodBgm(); }
         } else {
-          G.acc += dt;
+          G.acc += G.slowUntil && G.at < G.slowUntil ? dt * 0.3 : dt;
           while (G.acc >= C.DT && G.mode === 'play') { update(C.DT); G.acc -= C.DT; }
         }
       }

@@ -174,6 +174,7 @@
   // 球の表面の点(u=顔の横位置, v=高さ。どちらも半径が1)を画面に写す。
   // off … 経度のずらし(背中は PI)。もどり値 [x, y, c]。c は「こちらを向いている度合い」(1=正面, 0=ふち, マイナス=裏)。
   function proj(P, u, v, off) {
+    if (P.k && !off) { u *= P.k; v = FACE.v + (v - FACE.v) * P.k; }
     var r = rowR(v) * P.R, y = v * P.R;
     if (r < 0.5) return [0, y, 0];
     var k = clamp(u * P.R / r, -1, 1);
@@ -188,7 +189,8 @@
     if (p[2] < (minC == null ? 0.05 : minC)) return null;
     ctx.save();
     ctx.translate(p[0], p[1]);
-    ctx.scale(P.dir * p[2] * P.R, P.R);
+    var kk = (P.k && !off) ? P.k : 1;
+    ctx.scale(P.dir * p[2] * P.R * kk, P.R * kk);
     fn(p[2]);
     ctx.restore();
     return p;
@@ -339,7 +341,7 @@
   F('chabudai', 'ちゃぶだい', 'tsuntsun', { b: 'furious', e: 'angry', m: 'shout', c: 0, tint: 'angry', fx: ['table', 'wiggle'], anim: 'shake' });
   F('gununu', 'ぐぬぬ', 'tsuntsun', { b: 'angry2', bR: 'sad', e: 'squeeze', m: 'bite', c: 0.3, fx: ['sweat', 'text:ぐぬぬ'], anim: 'tremble' });
   F('kora', 'こらーっ', 'tsuntsun', { b: 'furious', e: ['angry', { size: 1.12 }], m: 'shout', c: 0, tint: 'angry', fx: ['excl2', 'shock'], anim: 'jump' });
-  F('bakuhatsu', 'ばくはつ', 'tsuntsun', { b: 'none', e: 'dot', m: 'O', c: 0, body: 'soot', tint: 'soot', acc: ['afro'], fx: ['smoke'] });
+  F('bakuhatsu', 'ばくはつ', 'tsuntsun', { b: 'none', e: ['tiny', { size: 1.15, pr: 0.2 }], m: 'O', c: 0, body: 'soot', tint: 'soot', acc: ['afro'], fx: ['smoke'] });
   F('iraira', 'いらいら', 'tsuntsun', { b: 'angry', e: ['half', { lidAng: 0.4, pr: 0.4, look: [0, 0] }], m: 'zigzag', c: 0, fx: ['veinMany'] });
   F('pui', 'ぷいっ', 'tsuntsun', { b: 'flat', e: ['half', { look: [-1, 0], lid: 0.4 }], m: 'pout', c: 0.7, yaw: 0.45, anim: 'tiltL', fx: ['text:ぷいっ'] });
   F('oni', 'おにモード', 'tsuntsun', { b: 'thick', e: 'furious', m: 'fang', c: 0, tint: 'angry', acc: ['horns'] });
@@ -363,8 +365,8 @@
   F('akire', 'あきれがお', 'dajare', { b: 'flat', e: ['half', { lid: 0.55, look: [0.6, -0.7] }], m: 'flat', c: 0, fx: ['sigh'] });
   F('shirome', 'しろめ', 'dajare', { b: 'high', e: 'white', m: 'O', c: 0, tint: 'pale' });
   F('nukegara', 'ぬけがら', 'dajare', { b: 'sad', e: 'line', m: 'o', c: 0, tint: 'pale', fx: ['ghost'] });
-  F('shiin', 'しーん', 'dajare', { b: 'flat', e: 'dot', m: 'tiny', c: 0, fx: ['crow'] });
-  F('kusu', 'くすっ', 'dajare', { b: 'relaxed', e: 'closed', m: 'omega', c: 0.6 });
+  F('shiin', 'しーん', 'dajare', { b: 'flat', e: 'dot', m: 'tiny', c: 0, tint: 'grey', fx: ['crow', 'text:シーン'] });
+  F('kusu', 'くすっ', 'dajare', { b: 'relaxed', e: 'closed', m: 'omega', c: 0.8, fx: ['text:くすっ'] });
   F('fuun', 'ふーん', 'dajare', { b: 'flat', bR: 'up', e: ['open', { look: [0.9, 0], pr: 0.4 }], m: 'flat', c: 0, fx: ['dots'] });
   F('zukoo', 'ずこーっ', 'dajare', { b: 'high', e: 'x', m: 'O', c: 0.2, anim: 'tiltBig', fx: ['shock'] });
   F('gaan', 'がーん', 'dajare', { b: 'sad', e: 'white', m: 'square', c: 0, tint: 'gloom', fx: ['lightning'] });
@@ -385,8 +387,8 @@
   F('gunyagunya', 'ぐにゃぐにゃ', 'kusuguru', { b: 'relaxed', e: 'wave', m: 'wavy', c: 0.7, tint: 'pink', anim: 'squash' });
   F('hanachouchin', 'はなちょうちん', 'kusuguru', { b: 'laugh', e: 'squeeze', m: 'open', c: 0.8, bubble: true });
   F('koshokosho', 'こしょこしょ', 'kusuguru', { b: 'worried', e: 'squeeze', m: 'ehe', c: 1, fx: ['wiggle', 'feather'] });
-  F('yamete', 'やめてー', 'kusuguru', { b: 'sad', e: 'cryHappy', m: 'open', c: 0.8, fx: ['sweatMany'], anim: 'shake' });
-  F('waraisugi', 'わらいすぎ', 'kusuguru', { b: 'laugh', e: 'squeeze', m: 'big', c: 1.2, tint: 'pink', fx: ['snot', 'laughTears'], anim: 'bounce' });
+  F('yamete', 'やめてー', 'kusuguru', { b: 'sad', e: 'wet', m: 'wail', c: 0.8, fx: ['sweatMany', 'wiggle'], anim: 'shake' });
+  F('waraisugi', 'わらいすぎ', 'kusuguru', { b: 'laugh', e: 'squeeze', m: 'big', c: 1.2, tint: 'pink', fx: ['snot', 'laughTears', 'text:ヒーッ'], anim: 'roll' });
   F('korokoro', 'ころころ', 'kusuguru', { b: 'laugh', e: 'happy', m: 'big', c: 0.8, anim: 'roll', fx: ['notes'] });
   F('uhyahya', 'うひゃひゃ', 'kusuguru', { b: 'laugh', bR: 'up', e: 'squeeze', eR: ['tiny', { size: 1.25 }], m: 'grinTeeth', c: 0.8, fx: ['notes'], anim: 'bounce' });
   F('torokegao', 'とろけがお', 'kusuguru', { b: 'relaxed', e: 'closed', m: 'drool', c: 1.1, tint: 'pink', anim: 'squash', fx: ['hearts'] });
@@ -395,7 +397,7 @@
   F('geragera', 'げらげら', 'kusuguru', { b: 'laugh', e: 'cryHappy', m: 'shout', c: 1, fx: ['text:ゲラゲラ'], anim: 'bounce' });
   F('maitta', 'まいった', 'kusuguru', { b: 'worried', e: 'squeeze', m: 'open', c: 0.7, fx: ['whiteFlag', 'sweat'] });
   F('nyanko', 'にゃんこ', 'kusuguru', { b: 'relaxed', e: 'happy', m: 'omega', c: 0.7, acc: ['catEars'], fx: ['text:にゃ'] });
-  F('shakkuri', 'しゃっくり', 'kusuguru', { b: 'high', e: 'dot', m: 'o', c: 0.4, fx: ['text:ヒック'], anim: 'jump' });
+  F('shakkuri', 'しゃっくり', 'kusuguru', { b: 'high', e: ['tiny', { size: 1.05 }], m: 'o', c: 0.4, fx: ['text:ヒック'], anim: 'jump' });
   F('shikaeshi', 'しかえしだ', 'kusuguru', { b: 'angry2', e: 'happy', m: 'grinTeeth', c: 0.3, tint: 'mean', fx: ['sparkle'] });
   F('dizzy', 'めがまわる', 'kusuguru', MOOD_RECIPES.dizzy);
   // いつでも(27)
@@ -1372,9 +1374,8 @@
         case 'wiggle':
           ctx.strokeStyle = INK; ctx.lineWidth = Math.max(1.2, R * 0.035);
           for (i = 0; i < 2; i++) {
-            var on = (Math.floor(t * 8) + i) % 2;
-            if (!on) continue;
-            [-1, 1].forEach(function (s) { ctx.beginPath(); ctx.arc(0, -R * 0.1, R * (1.08 + i * 0.14), s > 0 ? -0.5 : PI - 0.5 + 1, s > 0 ? 0.5 : PI + 0.5 + 1 - 1); ctx.stroke(); });
+            ctx.beginPath(); ctx.arc(0, -R * 0.05, R * (1.1 + i * 0.15), -0.45, 0.45); ctx.stroke();
+            ctx.beginPath(); ctx.arc(0, -R * 0.05, R * (1.1 + i * 0.15), PI - 0.45, PI + 0.45); ctx.stroke();
           }
           break;
         case 'feather':
@@ -1444,6 +1445,16 @@
           }
           ctx.globalAlpha = 1;
           break;
+        case 'bulb': {    // ひらめいた!
+          x = R * 0.78; y = -R * 1.05;
+          var glow = 0.6 + 0.4 * Math.sin(t * 6);
+          ctx.strokeStyle = 'rgba(255,220,60,' + glow + ')'; ctx.lineWidth = Math.max(1.2, R * 0.035);
+          for (i = 0; i < 7; i++) { a = -PI + i / 6 * PI; ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * R * 0.26, y + Math.sin(a) * R * 0.26); ctx.lineTo(x + Math.cos(a) * R * 0.38, y + Math.sin(a) * R * 0.38); ctx.stroke(); }
+          ctx.fillStyle = '#fff36b'; ctx.strokeStyle = INK; ctx.lineWidth = lw;
+          ctx.beginPath(); ctx.arc(x, y, R * 0.19, PI * 0.8, PI * 2.2); ctx.lineTo(x + R * 0.08, y + R * 0.24); ctx.lineTo(x - R * 0.08, y + R * 0.24); ctx.closePath(); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = '#9aa0a8'; ctx.fillRect(x - R * 0.08, y + R * 0.24, R * 0.16, R * 0.09); ctx.strokeRect(x - R * 0.08, y + R * 0.24, R * 0.16, R * 0.09);
+          break;
+        }
         case 'twitch':
           if (Math.sin(t * 9) > -0.3) {
             ctx.strokeStyle = '#e01b24'; ctx.lineWidth = Math.max(1.2, R * 0.035);
@@ -1519,7 +1530,7 @@
           var p = fract(t * 1.8 + i / 8), a = -0.2 + (i % 4) * 0.45 + (i > 3 ? PI * 0.5 : 0);
           var d = 0.08 + p * 0.3;
           ctx.globalAlpha = 1 - p;
-          ctx.beginPath(); ctx.arc(Math.cos(a) * d * (i % 2 ? 1 : -1), Math.abs(Math.sin(a)) * d * 0.6 + 0.04, 0.022, 0, TAU); ctx.fill();
+          ctx.beginPath(); ctx.arc(Math.cos(a) * d * (i % 2 ? 1 : -1) * 1.4, Math.abs(Math.sin(a)) * d * 0.7 + 0.04, 0.035, 0, TAU); ctx.fill();
         }
         ctx.globalAlpha = 1;
       }, 0, 0.2);
@@ -1629,7 +1640,7 @@
     else if (S.body === 'blue') { deco = '#ffffff'; deco2 = '#4a8ad8'; }
     else if (S.body === 'stone') { deco = '#8f8b84'; deco2 = '#5a5751'; }
     else if (S.body === 'soot') { deco = '#9a7a3a'; deco2 = '#5a4520'; }
-    var P = { R: R, yaw: yaw, dir: dir, deco: deco, deco2: deco2 };
+    var P = { R: R, yaw: yaw, dir: dir, deco: deco, deco2: deco2, k: size < 70 ? 1.13 : 0 };
     var faceC = Math.cos(yaw);
 
     // 体の動き(起き上がりこぼしのように、底を中心にゆれる)
@@ -1765,13 +1776,14 @@
       // ほっぺ
       if (S.cheek > 0 || S.puff) {
         [-1, 1].forEach(function (s) {
-          feat(ctx, P, s * (S.puff ? 0.43 : 0.45), S.puff ? 0.13 : 0.1, function () {
+          feat(ctx, P, s * (S.puff ? 0.42 : 0.45), S.puff ? 0.17 : 0.1, function () {
             var big = S.cheek > 1 ? 1.3 : 1, a = Math.min(1, S.cheek);
             if (S.puff) {   // ぷくー
-              ctx.fillStyle = 'rgba(255,170,175,0.85)'; ctx.strokeStyle = INK; ctx.lineWidth = 0.025;
-              ctx.beginPath(); ctx.arc(0, 0, 0.16, 0, TAU); ctx.fill();
-              ctx.beginPath(); ctx.arc(0, 0, 0.16, s > 0 ? -1.2 : PI - 0.6, s > 0 ? 0.6 : PI + 1.2); ctx.stroke();
-              ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.beginPath(); ctx.arc(-0.05, -0.06, 0.03, 0, TAU); ctx.fill();
+              var pg = ctx.createRadialGradient(-0.05, -0.06, 0.02, 0, 0, 0.21);
+              pg.addColorStop(0, '#ffd0d4'); pg.addColorStop(1, '#ff7f8c');
+              ctx.fillStyle = pg; ctx.strokeStyle = INK; ctx.lineWidth = 0.03;
+              ctx.beginPath(); ctx.arc(0, 0, 0.21, 0, TAU); ctx.fill(); ctx.stroke();
+              ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.beginPath(); ctx.arc(-0.07, -0.08, 0.04, 0, TAU); ctx.fill();
               return;
             }
             var cg = ctx.createRadialGradient(0, 0, 0, 0, 0, 0.11 * big);
@@ -1803,20 +1815,19 @@
         ctx.fillStyle = 'rgba(255,255,255,0.8)';
         ctx.beginPath(); ctx.arc(red ? -0.03 : -0.012, red ? -0.02 : -0.01, red ? 0.022 : 0.01, 0, TAU); ctx.fill();
       }, 0, 0.1);
+      drawMustache(ctx, P, -1, S, t);
+      drawMustache(ctx, P, 1, S, t);
+      drawMouth(ctx, P, S.mouth, t);
+      drawBeard(ctx, P, S.mouth);
       if (S.bubble) {   // 鼻ちょうちん
         feat(ctx, P, 0.04, 0.07, function () {
-          var ph = fract(t / 2.6), br = 0.03 + 0.13 * Math.sin(ph * PI * 0.5);
-          if (ph > 0.94) return;
+          var br = 0.13 + 0.07 * (0.5 + 0.5 * Math.sin(t * 1.4));
           ctx.fillStyle = 'rgba(190,230,255,0.55)'; ctx.strokeStyle = 'rgba(70,130,200,0.9)'; ctx.lineWidth = 0.015;
           ctx.beginPath(); ctx.arc(br * 0.8, br * 0.6, br, 0, TAU); ctx.fill(); ctx.stroke();
           ctx.fillStyle = 'rgba(255,255,255,0.9)';
           ctx.beginPath(); ctx.arc(br * 0.5, br * 0.25, br * 0.22, 0, TAU); ctx.fill();
         }, 0, 0.2);
       }
-      drawMustache(ctx, P, -1, S, t);
-      drawMustache(ctx, P, 1, S, t);
-      drawMouth(ctx, P, S.mouth, t);
-      drawBeard(ctx, P, S.mouth);
       drawFaceFx(ctx, P, S, t);
       drawAccFace(ctx, P, S, t);
     }
