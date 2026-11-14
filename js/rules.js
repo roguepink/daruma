@@ -42,7 +42,7 @@
     TICKLE_PAUSE: 0.8, DAJARE_PAUSE: 1.5, OCHA_PAUSE: 1.0, LULLABY_SEC: 1.5, OCHA_FACING_MUL: 0.5,
     HAGAO_SUCCESS: 0.65, HAGAO_CUT: 0.30, HAGAO_FAIL_ADD: 0.5,
     ITEM_SLOTS: 2, BLINDFOLD_SEC: 5, BLINDFOLD_WARN: 1.0,
-    PERFECT_SEC: 5, PERFECT_DROP_RATE: 8, TIMESTOP_SEC: 4, DOUBLE_SCORE_SEC: 15, GOLD_MALLET_HITS: 10,
+    PERFECT_SEC: 5, PERFECT_DROP_RATE: 3.5, PERFECT_TAP_DROPS: 2, HENGAO_COOLDOWN: 12, TICKLE_MOOD_CYCLES: 1, TIMESTOP_SEC: 4, DOUBLE_SCORE_SEC: 15, GOLD_MALLET_HITS: 10,
     // 演出
     OUT_FREEZE: 0.25, OUT_TOTAL: 1.6, RESUME_COUNT: 3,
     // 記録
@@ -75,18 +75,19 @@
 
   // 段。art = 絵の種類(DARUMA_ART.drawBlock の kind)。絵の色に合わせて名前をつけた
   var BLOCKS = {
-    aka:      { pts: 10,  kind: 'tap',    art: 'red',     name: 'ふつう' },
-    ao:       { pts: 20,  kind: 'mash',   art: 'hard',    name: 'かたい' },
-    midori:   { pts: 30,  kind: 'ring',   art: 'timing',  name: 'まと' },
-    kiiro:    { pts: 30,  kind: 'slide',  art: 'slide',   name: 'すべる' },
-    hibi:     { pts: 15,  kind: 'hibi',   art: 'crack',   name: 'ヒビ' },
-    murasaki: { pts: 50,  kind: 'double', art: 'double',  name: '2だん' },
-    mochi:    { pts: 40,  kind: 'mochi',  art: 'bounce',  name: 'おもち' },
-    kin:      { pts: 100, kind: 'mash',   art: 'gold',    name: '金' },
-    niji:     { pts: 50,  kind: 'tap',    art: 'rainbow', name: '虹' },
-    bakudan:  { pts: 80,  kind: 'tap',    art: 'bomb',    name: 'ばくだん' },
-    hoshi:    { pts: 10,  kind: 'tap',    art: 'blue',    name: 'ほし' }
+    aka:      { pts: 10,  kind: 'tap',    art: 'red',     color: '赤',   name: 'ふつう',   how: '1回',          hex: '#e23a3a' },
+    ao:       { pts: 20,  kind: 'mash',   art: 'blue',    color: '青',   name: 'かたい',   how: '連打 3〜6回',  hex: '#3f7fe6' },
+    midori:   { pts: 30,  kind: 'ring',   art: 'green',   color: '緑',   name: 'まと',     how: '輪が重なったら', hex: '#2fb05a' },
+    kiiro:    { pts: 30,  kind: 'slide',  art: 'yellow',  color: '黄',   name: 'すべる',   how: '▲がまんなかで', hex: '#f2c230' },
+    hibi:     { pts: 15,  kind: 'hibi',   art: 'crack',   color: '灰',   name: 'ヒビ',     how: '2回',          hex: '#c8bca4' },
+    murasaki: { pts: 50,  kind: 'double', art: 'purple',  color: '紫',   name: '2だん',    how: 'すばやく2回',  hex: '#a065dc' },
+    mochi:    { pts: 40,  kind: 'mochi',  art: 'mochi',   color: '白',   name: 'おもち',   how: '連打 5回',     hex: '#f7f3ea' },
+    kin:      { pts: 100, kind: 'mash',   art: 'gold',    color: '金',   name: 'きん',       how: '連打 8回',     hex: '#f0c030' },
+    niji:     { pts: 50,  kind: 'tap',    art: 'rainbow', color: '虹',   name: 'にじ',       how: '1回・アイテム', hex: '#ff7fb0' },
+    bakudan:  { pts: 80,  kind: 'tap',    art: 'bomb',    color: '黒',   name: 'ばくだん', how: '1回・ふりむく', hex: '#b0b0c0', chip: '#2b2b33' },
+    hoshi:    { pts: 10,  kind: 'tap',    art: 'star',    color: '水色', name: 'ほし',     how: '1回・玉+1',    hex: '#6cc8ec' }
   };
+  var BLOCK_ORDER = ['aka', 'hibi', 'ao', 'hoshi', 'midori', 'kiiro', 'mochi', 'murasaki', 'niji', 'bakudan', 'kin'];
   var BLOCK_WEIGHTS = [
     { aka: 60, ao: 20, midori: 12, hibi: 8 },
     { aka: 40, ao: 20, midori: 14, kiiro: 8, hibi: 8, hoshi: 5, niji: 3 },
@@ -105,16 +106,16 @@
     shield:    { name: 'まもり',     short: 'まもり', art: null, mark: '守', color: '#58b8d8', desc: '1回だけ セーフ' },
     kizuchi:   { name: '金の木づち', short: '金づち', art: 'perfect', mark: '槌', color: '#e0a820', desc: '10回 つよく叩く' },
     bai:       { name: '点数2倍',    short: '2倍',    art: null, mark: '倍', color: '#e8a020', desc: '15びょう 点数2倍' },
-    tokei:     { name: '時間止め',   short: '時間止め', art: null, mark: '止', color: '#6a8ab8', desc: '4びょう かたまる' },
-    perfect:   { name: 'パーフェクト', short: 'パーフェクト', art: null, mark: '極', color: '#ff5fa0', desc: '5びょう 落としまくり' }
+    tokei:     { name: '時間止め',   short: 'とめる', art: null, mark: '止', color: '#6a8ab8', desc: '4びょう かたまる' },
+    perfect:   { name: 'パーフェクト', short: 'むてき', art: null, mark: '極', color: '#ff5fa0', desc: '5びょう 落としまくり' }
   };
   var CHOTTO = {
     kusuguru: { name: 'くすぐる', cost: 1, art: 'feather' },
     dajare:   { name: 'ダジャレ', cost: 1, art: 'joke' },
-    ijiwaru:  { name: 'いじわる', cost: 0, art: 'prank' },
+    ijiwaru:  { name: 'つんつん', cost: 0, art: 'prank' },
     hengao:   { name: '変顔',     cost: 0, art: null }
   };
-  var CHOTTO_KEYS = ['kusuguru', 'dajare', 'ijiwaru', 'hengao'];
+  var CHOTTO_KEYS = ['kusuguru', 'dajare', 'ijiwaru'];   // 下のボタン。変顔は だるまさんの顔をタッチ
   var DAJARE_UKE = { futsu: 0.60, gokigen: 0.85, okori: 0.25, ijiwaru: 0.40, nemui: 0.50, nakisou: 0.70, tere: 0.60, bikkuri: 0.30 };
   var DAJARE = [
     'ふとんが ふっとんだ', 'アルミ缶の上に ある ミカン', 'イクラは いくら?', 'カエルが かえる', 'パンダの パンだ',
@@ -131,15 +132,17 @@
     nemui:   ['ねてないよ…ほんとだよ…', 'うとうと…はっ!見えた!', 'ねむくても 見えるんだよ'],
     antic:   ['まだ こっち見てるよ?', 'あわてんぼうさん!', 'もどるまで まってね'],
     early:   ['だいじょうぶ、赤い字が出たら 手をとめてね', '赤い「ころんだ」が 合図だよ', 'あせらず いこうね'],
-    best:    ['まいった!きみ、すごいね!', 'こんなに 落とされたの はじめて!', 'きみの かちだ…くやしい!'],
+    best:    ['まいった!左目に 目を入れて あげよう', 'まいった!きみ、すごいね!', 'こんなに 落とされたの はじめて!'],
+    nanakorobi: ['ころんでも 起きるのが だるまだよ。七転び八起き!', '何回ころんでも 起き上がるのが だるま流!'],
     long:    ['つかれた〜。また遊ぼうね', 'ながい しょうぶ だったね', 'もう ふらふら…'],
-    normal:  ['みーつけた!', 'つぎは もっと がんばってね', 'だるまさんは 見のがさないよ'],
+    normal:  ['手も足も 出なかったでしょ? …あ、それは ぼくか', 'みーつけた!', 'だるまさんは 見のがさないよ', 'ぼく、手も足もないけど 目は いいんだよ'],
     nakisou: ['さみしかったんだもん…', 'ずっと 見てたのに…', 'ぐすっ…みつけちゃった'],
     tere:    ['えへへ、見つけちゃった', 'はずかしいけど みてたよ', 'てへっ'],
     gokigen: ['ふふっ、見えちゃった♪', 'たのしいね〜', 'ごきげんでも 見てるよ']
   };
   var TITLES = [
-    { id: 'ippo',    name: 'はじめの一歩',     how: '1回 遊ぶ' },
+    { id: 'ippo',    name: 'はじめの一段',     how: '1回 遊ぶ' },
+    { id: 'nanakoro', name: '七転び八起き',    how: '通算 8回 遊ぶ' },
     { id: 'suberi',  name: 'すべりこみ名人',   how: '1回で すべりこみ 10回' },
     { id: 'okorase', name: 'おこらせ上手',     how: 'おこり中に 30段' },
     { id: 'dajare',  name: 'ダジャレ王',       how: 'ダジャレ ウケ 通算10回' },
@@ -292,7 +295,7 @@
   }
 
   function cycleCtx(S) {
-    return { warm: !S.tutorial && S.playT < CONFIG.WARMUP_SEC, tutorial: S.tutorial, stage: S.tutorial ? 0 : stageOf(S.dropped, S.playT) };
+    return { warm: !S.tutorial && S.playT < CONFIG.WARMUP_SEC, tutorial: S.tutorial, stage: S.tutorial ? 0 : stageOf(S.stageDrops || 0, S.playT) };
   }
   function addCycle(S, t0, from) {
     var d = S.d, c = cycleCtx(S);
@@ -530,7 +533,8 @@
     return S;
   }
 
-  function stageNow(S) { return S.tutorial ? 0 : stageOf(S.dropped, S.playT); }
+  // 難しさの段階は、むてき(パーフェクト)で落とした段を数えない(一気に難しくならないように)
+  function stageNow(S) { return S.tutorial ? 0 : stageOf(S.stageDrops || 0, S.playT); }
 
   function step(S, dt) {
     var t0 = S.t, t1 = S.t + dt, ev = [];
@@ -541,13 +545,15 @@
       if (e.type !== 'phase') continue;
       if (e.prev === 'RETURN' && e.k !== 'WARN') {   // 戻り終わった(二度見の予兆は のぞく)
         if (S.windowDrops > S.bestWindow) S.bestWindow = S.windowDrops;
-        S.windowDrops = 0; S.combo = 0;
-        ev.push({ type: 'returned' });
+        ev.push({ type: 'returned', drops: S.windowDrops });
+        S.windowDrops = 0; S.combo = 0; S.goldWin = false;
         if (S.tutorial) {
           S.tutTurns++;
           if (S.tutTurns >= CONFIG.TUTORIAL_TURNS) { endTutorial(S); ev.push({ type: 'tutorialDone' }); }
         }
       }
+      if (e.prev === 'PERFECT') ev.push({ type: 'perfectEnd', count: S.perfCount || 0, pts: S.perfPts || 0 });
+      if (e.k === 'WATCH' && S.goldWin && !isBlind(S, t1)) ev.push({ type: 'goldSeen' });
       if (e.k === 'WATCH') {
         var face = isBlind(S, t1) ? 'mekakushi' : S.d.mood;
         if (!S.seen[face]) { S.seen[face] = true; ev.push({ type: 'newFace', face: face }); }
@@ -568,7 +574,7 @@
   }
 
   function endTutorial(S) {
-    S.tutorial = false; S.playT = 0; S.score = 0; S.dropped = 0; S.combo = 0; S.bestCombo = 0; S.squeezes = 0; S.bestWindow = 0;
+    S.tutorial = false; S.playT = 0; S.score = 0; S.dropped = 0; S.stageDrops = 0; S.combo = 0; S.bestCombo = 0; S.squeezes = 0; S.bestWindow = 0;
     S.counts = { gold: 0, bomb: 0, okoriDrops: 0, nemuiDrops: 0, hengaoOK: 0, dajareUke: 0, perfects: 0, shieldSaves: 0 };
     S.tama = CONFIG.TAMA_START; S.tamaCounter = 0;
   }
@@ -588,7 +594,7 @@
     o = o || {};
     var ev = [], b = S.tower.shift(); if (!b) return ev;
     var dbl = t < S.doubleUntil, mood = S.d.mood, pts;
-    if (o.perfect) pts = Math.round(BLOCKS[b.t].pts * (dbl ? 2 : 1));
+    if (o.perfect) { pts = Math.round(BLOCKS[b.t].pts * (dbl ? 2 : 1)); S.perfCount = (S.perfCount || 0) + (b.kind === 'double' ? 2 : 1); S.perfPts = (S.perfPts || 0) + pts; }
     else {
       S.combo++; if (S.combo > S.bestCombo) S.bestCombo = S.combo;
       S.windowDrops++;
@@ -598,6 +604,7 @@
     S.score += pts;
     var n = b.kind === 'double' ? 2 : 1;
     S.dropped += n;
+    if (!o.perfect) S.stageDrops = (S.stageDrops || 0) + n;
     if (mood === 'okori') S.counts.okoriDrops += n;
     if (mood === 'nemui') S.counts.nemuiDrops += n;
     S.blockReadyAt = t + CONFIG.DROP_COOLDOWN;
@@ -605,7 +612,7 @@
     S.tamaCounter += n;
     if (S.tamaCounter >= CONFIG.TAMA_EVERY) { S.tamaCounter -= CONFIG.TAMA_EVERY; if (S.tama < CONFIG.TAMA_MAX) { S.tama++; ev.push({ type: 'tama' }); } }
     if (b.t === 'hoshi' && S.tama < CONFIG.TAMA_MAX) { S.tama++; ev.push({ type: 'tama' }); }
-    if (b.t === 'kin') S.counts.gold++;
+    if (b.t === 'kin') { S.counts.gold++; S.goldWin = true; }
     if (b.t === 'niji') {
       S.bst.rainbows++;
       var it = (S.firstPlay && S.bst.rainbows === 2) ? 'perfect' : wpick(S.rng, ITEM_POOL);
@@ -644,7 +651,7 @@
       ev.push({ type: 'out' });
       return ev;
     }
-    if (k === 'PERFECT') return dropBlock(S, t, { perfect: true });
+    if (k === 'PERFECT') { var pe = []; for (var q = 0; q < CONFIG.PERFECT_TAP_DROPS; q++) pe = pe.concat(dropBlock(S, t, { perfect: true })); return pe; }
     if (t < S.blockReadyAt) { ev.push({ type: 'tooFast' }); return ev; }
     var b = S.tower[0], power = 1;
     if (S.malletHits > 0) { power = 3; S.malletHits--; }
@@ -657,10 +664,11 @@
 
   // ------------------------------------------------------------------ ちょっかい・アイテム
   var CHOTTO_PHASES = { SAFE: 1, PAUSE: 1, FEINT: 1, WARN: 1 };
+  var HENGAO_P = { okori: 0.25, bikkuri: 0.30, ijiwaru: 0.35 };   // 変顔が効く確率(ほかの気分は HAGAO_SUCCESS)
   function canUseChotto(S, name, t) {
     if (S.out) return false;
     var k = kindAt(S.d, t);
-    if (name === 'hengao') { var p = phaseAt(S.d, t); return k === 'WATCH' && S.hengaoPh !== p && !isBlind(S, t); }
+    if (name === 'hengao') { var p = phaseAt(S.d, t); return k === 'WATCH' && S.hengaoPh !== p && !isBlind(S, t) && t >= (S.hengaoReadyAt || 0); }
     if (!CHOTTO_PHASES[k]) return false;
     if (name === 'ijiwaru') return t >= S.teaseReadyAt;
     return S.tama >= CHOTTO[name].cost;
@@ -676,10 +684,16 @@
     if (name === 'kusuguru') {
       S.tama -= 1;
       if (bored(S, name, t)) { setMood(S, 'ijiwaru', 2, t); ev.push({ type: 'bored', name: name }); return ev; }
-      S.d.prev = S.d.mood === 'bikkuri' ? S.d.prev : S.d.mood;
-      S.d.mood = 'gokigen'; S.d.left = 2;
-      rebuild(S, t, { sec: CONFIG.TICKLE_PAUSE, kind: 'FROZEN', say: 'くすくす' }, 0);   // 予兆も取り消して「だ」から
-      ev.push({ type: 'tickle' });
+      var inWarn = kindAt(S.d, t) === 'WARN';
+      if (inWarn) {
+        // 予兆の最中は 気分も変えない(「くすくす…でも 見るよ」)。逃げボタンにしないため
+        insertPause(S, t, CONFIG.TICKLE_PAUSE, 'FROZEN', 'くすくす');              // 予兆は そのまま(残りは TELL_MIN 以上)
+      } else {
+        S.d.prev = S.d.mood === 'bikkuri' ? S.d.prev : S.d.mood;
+        S.d.mood = 'gokigen'; S.d.left = CONFIG.TICKLE_MOOD_CYCLES;
+        rebuild(S, t, { sec: CONFIG.TICKLE_PAUSE, kind: 'FROZEN', say: 'くすくす' }, 0);
+      }
+      ev.push({ type: 'tickle', warn: inWarn });
     } else if (name === 'dajare') {
       S.tama -= 1;
       var joke = DAJARE[Math.floor(rng() * DAJARE.length)];
@@ -701,11 +715,13 @@
       if (mood === 'okori') setMood(S, 'nakisou', 3, t); else setMood(S, 'okori', 4, t);
       ev.push({ type: 'tease', cry: mood === 'okori' });
     } else if (name === 'hengao') {
+      // にらめっこ: こっち向きを縮めるだけ(気分は変えない)。使ったら待ち時間。同じ手を続けると あきる
       S.hengaoPh = phaseAt(S.d, t);
-      var p = CONFIG.HAGAO_SUCCESS * (mood === 'okori' || mood === 'bikkuri' ? 0.5 : 1);
-      if (rng() < p) {
+      S.hengaoReadyAt = t + CONFIG.HENGAO_COOLDOWN;
+      if (bored(S, name, t)) { cutWatch(S, t, 1, CONFIG.HAGAO_FAIL_ADD); ev.push({ type: 'hengao', ok: false, bored: true }); return ev; }
+      var hp = HENGAO_P[mood] != null ? HENGAO_P[mood] : CONFIG.HAGAO_SUCCESS;
+      if (rng() < hp) {
         cutWatch(S, t, CONFIG.HAGAO_CUT); S.counts.hengaoOK++;
-        setMood(S, 'gokigen', 2, t);
         ev.push({ type: 'hengao', ok: true });
       } else {
         cutWatch(S, t, 1, CONFIG.HAGAO_FAIL_ADD);
@@ -734,14 +750,15 @@
       case 'komoriuta':
         if (mood === 'okori') { ev.push({ type: 'noSleep' }); break; }
         setMood(S, 'nemui', 3, t);
-        insertPause(S, t, CONFIG.LULLABY_SEC, 'FROZEN', 'ねんねん ころり…');
+        insertPause(S, t, CONFIG.LULLABY_SEC, 'FROZEN', 'ねないよ… ねないって ば… ふぁ〜あ');
         break;
       case 'kizuchi': S.malletHits = CONFIG.GOLD_MALLET_HITS; break;
       case 'bai': S.doubleUntil = t + CONFIG.DOUBLE_SCORE_SEC; break;
         case 'tokei': insertPause(S, t, CONFIG.TIMESTOP_SEC, 'STOP', null); break;   // 予兆の途中なら insertPause が残りを TELL_MIN 以上にする
       case 'perfect':
         S.counts.perfects++;
-        rebuild(S, t, { sec: CONFIG.PERFECT_SEC, kind: 'PERFECT', say: 'うっとり〜♪' }, 0);   // 終わったら「だ」から言い直し
+        S.perfCount = 0; S.perfPts = 0;
+        rebuild(S, t, { sec: CONFIG.PERFECT_SEC, kind: 'PERFECT', say: 'あっ、ちょうちょ〜♪' }, 0);   // 終わったら「だ」から言い直し
         break;
     }
     return ev;
@@ -760,6 +777,7 @@
     var got = [];
     function c(id, ok) { if (ok) got.push(id); }
     c('ippo', true);
+    c('nanakoro', (rec.plays || 0) >= 8);
     c('suberi', st.squeezes >= 10);
     c('okorase', st.counts.okoriDrops >= 30);
     c('dajare', (rec.dajareUke || 0) >= 10);
@@ -774,6 +792,7 @@
   function endLine(st, isBest, rng) {
     var key = 'normal';
     if (isBest && st.dan > 0) key = 'best';
+    else if ((st.plays || 0) >= 3 && rng() < 0.35) key = 'nanakorobi';
     else if (st.early) key = 'early';
     else if (st.time >= 300) key = 'long';
     else if (st.antic) key = 'antic';
@@ -793,7 +812,7 @@
   // ------------------------------------------------------------------ 公開
   var api = {
     CONFIG: CONFIG, MOODS: MOODS, MOOD_KEYS: MOOD_KEYS, FACE_KEYS: FACE_KEYS, MOOD_DRIFT: MOOD_DRIFT, WARMUP_DRIFT: WARMUP_DRIFT,
-    BLOCKS: BLOCKS, BLOCK_WEIGHTS: BLOCK_WEIGHTS, ITEM_POOL: ITEM_POOL, ITEMS: ITEMS, CHOTTO: CHOTTO, CHOTTO_KEYS: CHOTTO_KEYS,
+    BLOCKS: BLOCKS, BLOCK_ORDER: BLOCK_ORDER, BLOCK_WEIGHTS: BLOCK_WEIGHTS, ITEM_POOL: ITEM_POOL, ITEMS: ITEMS, CHOTTO: CHOTTO, CHOTTO_KEYS: CHOTTO_KEYS,
     DAJARE: DAJARE, DAJARE_UKE: DAJARE_UKE, LINES: LINES, TITLES: TITLES,
     makeRng: makeRng, rRange: rRange, rInt: rInt, wpick: wpick, clamp: clamp,
     stageOf: stageOf, stageNow: stageNow, makeCycle: makeCycle, phaseAt: phaseAt, kindAt: kindAt, chantIndex: chantIndex,

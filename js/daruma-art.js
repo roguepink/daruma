@@ -1030,7 +1030,9 @@
     bounce:  { c: '#ff8cc0', label: 'はねる' },
     double:  { c: '#f08a3c', label: '2段' },
     bomb:    { c: '#2b2b33', label: 'ばくだん' },
-    mystery: { c: '#5b3fa8', label: 'なぞ' }
+    mystery: { c: '#5b3fa8', label: 'なぞ' },
+    mochi:   { c: '#f7f3ea', label: 'おもち' },   // (作る係が足した)白いおもち
+    star:    { c: '#6cc8ec', label: 'ほし' }      // (作る係が足した)水色に白い星
   };
   var BLOCK_KINDS = Object.keys(KIND);
 
@@ -1250,6 +1252,21 @@
           sparkle(ctx, (-0.4 + i * 0.2) * w, y0 + hh * (i % 2 ? 0.3 : 0.75), hh * (0.05 + 0.07 * sp), 'rgba(255,240,180,0.9)');
         }
         outlinedText(ctx, '?', 0, ym + ry * 0.3, Math.round(hh * 0.72), '#ffd84a', INK);
+        break;
+      case 'mochi': // (作る係が足した)ぷにぷにの白いおもち: ほんのり桃色の影と つや
+        ctx.fillStyle = 'rgba(255,190,200,0.35)';
+        ctx.beginPath(); ctx.ellipse(-w * 0.28, ym + ry * 0.3, w * 0.09, hh * 0.18, 0, 0, TAU); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(w * 0.28, ym + ry * 0.3, w * 0.09, hh * 0.18, 0, 0, TAU); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        ctx.beginPath(); ctx.ellipse(-w * 0.1, y0 + hh * 0.35, w * 0.12, hh * 0.1, -0.1, 0, TAU); ctx.fill();
+        break;
+      case 'star': // (作る係が足した)白い星もよう
+        ctx.fillStyle = 'rgba(255,255,255,0.92)';
+        for (i = -2; i <= 2; i++) {
+          th = i * 0.55; x = cylX(w, th);
+          star(ctx, x, ym + ry * Math.cos(th) * 0.4, hh * 0.22 * (0.6 + 0.4 * Math.cos(th)), 5, 0.45, 0);
+          ctx.fill();
+        }
         break;
     }
     // 上下の金(白)の細い帯
