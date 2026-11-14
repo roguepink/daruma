@@ -259,7 +259,7 @@
   };
   var EYES = {
     open: {}, big: { size: 1.15, pr: 0.6 }, tiny: { size: 1.12, pr: 0.26, look: [0, 0] },
-    happy: { type: 'arcUp' }, closed: { type: 'arcDown' }, squeeze: { type: 'squeeze' }, spiral: { type: 'spiral' },
+    happy: { type: 'arcUp' }, crescent: { type: 'crescent' }, closed: { type: 'arcDown' }, squeeze: { type: 'squeeze' }, spiral: { type: 'spiral' },
     white: { type: 'blank' }, none: { type: 'none' }, half: { lid: 0.5 },
     sleepy: { lid: 0.6, lidAng: -0.12, pr: 0.5, look: [0, 0.45], sway: true },
     angry: { pr: 0.38, lid: 0.36, lidAng: 0.55, look: [0, 0.05] }, furious: { glow: true, lid: 0.34, lidAng: 0.6 },
@@ -339,15 +339,15 @@
   F('mutt', 'むっ', 'tsuntsun', { b: 'low', e: ['open', { pr: 0.4, look: [0, 0] }], m: 'frown', c: 0, fx: ['twitch', 'text:ムッ'] });
   F('girori', 'ぎろり', 'tsuntsun', { b: 'angry', e: 'glare', m: 'flat', c: 0, tint: 'mean', fx: ['text:ギロッ'] });
   F('chabudai', 'ちゃぶだい', 'tsuntsun', { b: 'furious', e: 'angry', m: 'shout', c: 0, tint: 'angry', fx: ['table', 'wiggle'], anim: 'shake' });
-  F('gununu', 'ぐぬぬ', 'tsuntsun', { b: 'angry2', bR: 'sad', e: 'squeeze', m: 'bite', c: 0.3, fx: ['sweat', 'text:ぐぬぬ'], anim: 'tremble' });
+  F('gununu', 'ぐぬぬ', 'tsuntsun', { b: 'angry2', bR: 'sad', e: 'squeeze', m: 'bite', c: 0, tint: 'mean', fx: ['sweat', 'text:ぐぬぬ', 'twitch'], anim: 'tremble' });
   F('kora', 'こらーっ', 'tsuntsun', { b: 'furious', e: ['angry', { size: 1.12 }], m: 'shout', c: 0, tint: 'angry', fx: ['excl2', 'shock'], anim: 'jump' });
   F('bakuhatsu', 'ばくはつ', 'tsuntsun', { b: 'none', e: ['tiny', { size: 1.15, pr: 0.2 }], m: 'O', c: 0, body: 'soot', tint: 'soot', acc: ['afro'], fx: ['smoke'] });
   F('iraira', 'いらいら', 'tsuntsun', { b: 'angry', e: ['half', { lidAng: 0.4, pr: 0.4, look: [0, 0] }], m: 'zigzag', c: 0, fx: ['veinMany'] });
   F('pui', 'ぷいっ', 'tsuntsun', { b: 'flat', e: ['half', { look: [-1, 0], lid: 0.4 }], m: 'pout', c: 0.7, yaw: 0.45, anim: 'tiltL', fx: ['text:ぷいっ'] });
   F('oni', 'おにモード', 'tsuntsun', { b: 'thick', e: 'furious', m: 'fang', c: 0, tint: 'angry', acc: ['horns'] });
   F('meramera', 'めらめら', 'tsuntsun', { b: 'angry', e: 'fire', m: 'grinTeeth', c: 0.2, fx: ['flames'] });
-  F('shiranpuri', 'しらんぷり', 'tsuntsun', { b: 'relaxed', e: 'closed', m: 'whistle', c: 0.3, yaw: 0.35, fx: ['notes'] });
-  F('itai', 'いたっ', 'tsuntsun', { b: 'sad', e: 'squeeze', m: 'wavy', c: 0.4, fx: ['bump', 'pain'] });
+  F('shiranpuri', 'しらんぷり', 'tsuntsun', { b: 'up', e: 'closed', m: 'whistle', c: 0.3, yaw: 0.55, anim: 'tiltL', fx: ['notes'] });
+  F('itai', 'いたっ', 'tsuntsun', { b: 'sad', e: 'squeeze', m: 'wail', c: 0.4, fx: ['bump', 'stars', 'tearSmall'] });
   F('bansoukou', 'ばんそうこう', 'tsuntsun', { b: 'sad', e: 'wet', m: 'sad', c: 0.3, acc: ['bandage'], fx: ['tears'] });
   F('motto', 'もっとやって', 'tsuntsun', { b: 'happy', e: 'heart', m: 'open', c: 1, fx: ['hearts'], anim: 'sway' });
   F('tehepero', 'てへぺろ', 'tsuntsun', { b: 'happy', e: 'open', eR: 'squeeze', m: 'tongue', c: 0.8, fx: ['star1'] });
@@ -358,7 +358,7 @@
   F('ijiiji', 'いじいじ', 'tsuntsun', { b: 'sad', e: 'dot', m: 'tiny', c: 0, tint: 'gloom', fx: ['gloom'] });
   F('uwaan', 'うわーん', 'tsuntsun', { b: 'sad', e: 'cry', m: 'wail', c: 0.5, anim: 'tremble' });
   // ダジャレ(22)
-  F('fuita', 'ぷぷっ', 'dajare', { b: 'happy', e: 'squeeze', m: 'puffLips', puff: true, c: 0.9, fx: ['spray'], anim: 'shake' });
+  F('fuita', 'ぷぷっ', 'dajare', { b: 'happy', e: 'squeeze', m: 'puffLips', puff: true, c: 0.9, fx: ['spray', 'text:ぶっ'], anim: 'shake' });
   F('samu', 'さむっ', 'dajare', { b: 'worried', e: 'dot', m: 'zigzag', c: 0, body: 'blue', tint: 'pale', fx: ['snow', 'icicle'], anim: 'tremble' });
   F('jiwajiwa', 'じわじわ', 'dajare', { b: 'worried', e: ['half', { lid: 0.45, look: [0, 0.3] }], m: 'wobbly', c: 0.7, fx: ['sweat', 'text:じわ…'], anim: 'trembleSmall' });
   F('ooke', 'まさかの大ウケ', 'dajare', { b: 'laugh', e: 'cryHappy', m: 'big', c: 1, fx: ['confetti'], anim: 'bounce', st: -0.03 });
@@ -366,39 +366,39 @@
   F('shirome', 'しろめ', 'dajare', { b: 'high', e: 'white', m: 'O', c: 0, tint: 'pale' });
   F('nukegara', 'ぬけがら', 'dajare', { b: 'sad', e: 'line', m: 'o', c: 0, tint: 'pale', fx: ['ghost'] });
   F('shiin', 'しーん', 'dajare', { b: 'flat', e: 'dot', m: 'tiny', c: 0, tint: 'grey', fx: ['crow', 'text:シーン'] });
-  F('kusu', 'くすっ', 'dajare', { b: 'relaxed', e: 'closed', m: 'omega', c: 0.8, fx: ['text:くすっ'] });
+  F('kusu', 'くすっ', 'dajare', { b: 'relaxed', e: 'closed', m: 'omega', c: 1.2, tint: 'pink', fx: ['text:くすっ', 'sparkle'] });
   F('fuun', 'ふーん', 'dajare', { b: 'flat', bR: 'up', e: ['open', { look: [0.9, 0], pr: 0.4 }], m: 'flat', c: 0, fx: ['dots'] });
   F('zukoo', 'ずこーっ', 'dajare', { b: 'high', e: 'x', m: 'O', c: 0.2, anim: 'tiltBig', fx: ['shock'] });
   F('gaan', 'がーん', 'dajare', { b: 'sad', e: 'white', m: 'square', c: 0, tint: 'gloom', fx: ['lightning'] });
   F('zabuton', 'ざぶとん1まい', 'dajare', { b: 'happy', e: 'sparkle', m: 'grinTeeth', c: 0.8, fx: ['zabuton'] });
   F('katamatta', 'かたまった', 'dajare', { b: 'flat', e: 'dot', m: 'flat', c: 0, body: 'stone', tint: 'stone' });
-  F('nigawarai', 'にがわらい', 'dajare', { b: 'worried', e: 'happy', m: 'wavy', c: 0.4, fx: ['sweatBig'] });
+  F('nigawarai', 'にがわらい', 'dajare', { b: 'worried', e: 'happy', m: 'grimace', c: 0.2, tint: 'grey', fx: ['sweatBig'] });
   F('pokaan', 'ぽかーん', 'dajare', { b: 'high', e: 'dot', m: 'yawnBig', c: 0, fx: ['butterfly'] });
   F('tooime', 'とおいめ', 'dajare', { b: 'relaxed', e: ['tiny', { look: [0.5, -0.8], pr: 0.18 }], m: 'flat', c: 0, tint: 'pale', fx: ['birds'] });
   F('mouikkai', 'もういっかい!', 'dajare', { b: 'high', e: 'big', m: 'triangle', c: 0.9, fx: ['excl'], anim: 'jump' });
   F('shirake', 'しらけー', 'dajare', { b: 'flat', e: 'line', m: 'flat', c: 0, tint: 'grey', fx: ['wind'] });
   F('gakkari', 'がっかり', 'dajare', { b: 'sad', e: ['half', { look: [0, 0.9] }], m: 'frown', c: 0, tint: 'sad', fx: ['sigh'] });
   F('futon', 'ふとんがー', 'dajare', { b: 'high', e: 'tiny', m: 'O', c: 0.3, fx: ['futon'] });
-  F('osomatsu', 'おそまつさま', 'dajare', { b: 'relaxed', e: 'closed', m: 'smile', c: 0.5, anim: 'bow', fx: ['text:ペコ'] });
+  F('osomatsu', 'おそまつさま', 'dajare', { b: 'relaxed', e: 'closed', m: 'smile', c: 0.5, anim: 'bow', fx: ['sensu', 'text:ペコ'] });
   // くすぐる(19)
   F('laugh', 'ひーひー', 'kusuguru', MOOD_RECIPES.laugh);
   F('namidawarai', 'なみだわらい', 'kusuguru', { b: 'laugh', e: 'wet', m: 'big', c: 0.9, fx: ['laughTears'], anim: 'bounce', st: -0.025 });
-  F('koraegao', 'こらえがお', 'kusuguru', { b: 'worried', e: 'line', m: 'puffLips', puff: true, c: 1, anim: 'tremble', fx: ['text:ぷるぷる'] });
-  F('gunyagunya', 'ぐにゃぐにゃ', 'kusuguru', { b: 'relaxed', e: 'wave', m: 'wavy', c: 0.7, tint: 'pink', anim: 'squash' });
-  F('hanachouchin', 'はなちょうちん', 'kusuguru', { b: 'laugh', e: 'squeeze', m: 'open', c: 0.8, bubble: true });
-  F('koshokosho', 'こしょこしょ', 'kusuguru', { b: 'worried', e: 'squeeze', m: 'ehe', c: 1, fx: ['wiggle', 'feather'] });
+  F('koraegao', 'こらえがお', 'kusuguru', { b: 'worried', e: 'line', m: 'puffLips', puff: true, c: 1, tint: 'angry', anim: 'tremble', fx: ['text:ぷるぷる', 'sweatMany'] });
+  F('gunyagunya', 'ぐにゃぐにゃ', 'kusuguru', { b: 'relaxed', e: 'wave', m: 'wavy', c: 0.7, body: 'green', anim: 'squash', fx: ['wiggle'] });
+  F('hanachouchin', 'はなちょうちん', 'kusuguru', { b: 'laugh', e: 'crescent', m: 'grinTeeth', c: 0.8, bubble: true, body: 'blue' });
+  F('koshokosho', 'こしょこしょ', 'kusuguru', { b: 'worried', e: 'squeeze', m: 'ehe', c: 1.2, fx: ['feather', 'text:こしょ'] });
   F('yamete', 'やめてー', 'kusuguru', { b: 'sad', e: 'wet', m: 'wail', c: 0.8, fx: ['sweatMany', 'wiggle'], anim: 'shake' });
-  F('waraisugi', 'わらいすぎ', 'kusuguru', { b: 'laugh', e: 'squeeze', m: 'big', c: 1.2, tint: 'pink', fx: ['snot', 'laughTears', 'text:ヒーッ'], anim: 'roll' });
-  F('korokoro', 'ころころ', 'kusuguru', { b: 'laugh', e: 'happy', m: 'big', c: 0.8, anim: 'roll', fx: ['notes'] });
+  F('waraisugi', 'わらいすぎ', 'kusuguru', { b: 'laugh', e: 'squeeze', m: 'big', c: 1.2, tint: 'pink', body: 'pink', fx: ['snot', 'laughTears', 'text:ヒーッ'], anim: 'roll' });
+  F('korokoro', 'ころころ', 'kusuguru', { b: 'laugh', e: 'crescent', m: 'big', c: 0.8, body: 'yellow', anim: 'roll', fx: ['text:コロコロ'] });
   F('uhyahya', 'うひゃひゃ', 'kusuguru', { b: 'laugh', bR: 'up', e: 'squeeze', eR: ['tiny', { size: 1.25 }], m: 'grinTeeth', c: 0.8, fx: ['notes'], anim: 'bounce' });
-  F('torokegao', 'とろけがお', 'kusuguru', { b: 'relaxed', e: 'closed', m: 'drool', c: 1.1, tint: 'pink', anim: 'squash', fx: ['hearts'] });
+  F('torokegao', 'とろけがお', 'kusuguru', { b: 'relaxed', e: 'wave', m: 'drool', c: 1.1, tint: 'pink', anim: 'squash', fx: ['hearts', 'onsen'] });
   F('moudame', 'もうだめ…', 'kusuguru', { b: 'sad', e: 'x', m: 'tongueLoose', c: 0.3, tint: 'pale', fx: ['sweatMany'] });
-  F('pikupiku', 'ぴくぴく', 'kusuguru', { b: 'worried', bR: 'up', e: 'half', eR: 'squeeze', m: 'wavy', c: 0.5, fx: ['twitch'], anim: 'twitch' });
+  F('pikupiku', 'ぴくぴく', 'kusuguru', { b: 'worried', bR: 'up', e: 'tiny', eR: 'squeeze', m: 'zigzag', c: 0.5, body: 'purple', fx: ['twitch', 'sweatBig'], anim: 'twitch' });
   F('geragera', 'げらげら', 'kusuguru', { b: 'laugh', e: 'cryHappy', m: 'shout', c: 1, fx: ['text:ゲラゲラ'], anim: 'bounce' });
-  F('maitta', 'まいった', 'kusuguru', { b: 'worried', e: 'squeeze', m: 'open', c: 0.7, fx: ['whiteFlag', 'sweat'] });
+  F('maitta', 'まいった', 'kusuguru', { b: 'sad', e: 'dot', m: 'wavy', c: 0.6, fx: ['whiteFlag', 'sweatBig'] });
   F('nyanko', 'にゃんこ', 'kusuguru', { b: 'relaxed', e: 'happy', m: 'omega', c: 0.7, acc: ['catEars'], fx: ['text:にゃ'] });
   F('shakkuri', 'しゃっくり', 'kusuguru', { b: 'high', e: ['tiny', { size: 1.05 }], m: 'o', c: 0.4, fx: ['text:ヒック'], anim: 'jump' });
-  F('shikaeshi', 'しかえしだ', 'kusuguru', { b: 'angry2', e: 'happy', m: 'grinTeeth', c: 0.3, tint: 'mean', fx: ['sparkle'] });
+  F('shikaeshi', 'しかえしだ', 'kusuguru', { b: 'angry2', e: 'happy', m: 'grinTeeth', c: 0, body: 'black', fx: ['sparkle'] });
   F('dizzy', 'めがまわる', 'kusuguru', MOOD_RECIPES.dizzy);
   // いつでも(27)
   F('normal', 'ふつう', 'common', MOOD_RECIPES.normal);
@@ -413,19 +413,19 @@
   F('kyoton', 'きょとん', 'common', { b: 'high', e: 'dot', m: 'tiny', c: 0.5, fx: ['q1'] });
   F('mitore', 'みとれ', 'common', { b: 'happy', e: 'sparkle', m: 'o', c: 0.9, fx: ['sparkle'] });
   F('hirameki', 'ひらめいた', 'common', { b: 'high', e: ['open', { look: [0.3, -0.9] }], m: 'open', c: 0.5, fx: ['bulb'] });
-  F('uttori', 'うっとり', 'common', { b: 'relaxed', e: 'closed', m: 'smile', c: 1, fx: ['flowers', 'hearts'] });
+  F('uttori', 'うっとり', 'common', { b: 'relaxed', e: 'heart', m: 'o', c: 1, fx: ['flowers'] });
   F('kangae', 'かんがえちゅう', 'common', { b: 'flat', bR: 'up', e: ['open', { look: [0.7, -0.7] }], m: 'pout', c: 0.3, fx: ['think'] });
   F('harapeko', 'はらぺこ', 'common', { b: 'worried', e: 'wet', m: 'drool', c: 0.4, fx: ['riceball'] });
-  F('hakushon', 'はっくしょん', 'common', { b: 'high', e: 'squeeze', m: 'O', c: 0.6, fx: ['spray', 'snot'], anim: 'jump' });
-  F('akubi', 'ふわぁ', 'common', { b: 'relaxed', e: 'line', m: 'yawnBig', c: 0.4, fx: ['tearSmall'] });
+  F('hakushon', 'はっくしょん', 'common', { b: 'high', e: 'squeeze', m: 'O', c: 0.6, nose: 'red', fx: ['spray', 'snot', 'text:ハクション'], anim: 'jump' });
+  F('akubi', 'ふわぁ', 'common', { b: 'relaxed', e: 'line', m: 'yawnBig', c: 0.4, acc: ['nightcap'], fx: ['tearSmall'] });
   F('pachi', 'ぱちっ', 'common', { b: 'happy', e: 'open', eR: 'happy', m: 'smile', c: 0.6, fx: ['star1'] });
   F('kimatta', 'きまった!', 'common', { b: 'up', e: 'open', m: 'smug', c: 0.3, acc: ['sunglasses'], fx: ['sparkle'] });
   F('megane', 'めがねさん', 'common', { b: 'normal', e: ['open', { size: 0.9, look: [0, 0] }], m: 'ehe', c: 0.4, acc: ['glasses'] });
   F('yaruki', 'やるき!', 'common', { b: 'angry', e: ['open', { pr: 0.55, look: [0, 0] }], m: 'grinTeeth', c: 0.5, acc: ['hachimaki'], fx: ['text:よし!'] });
   F('buruburu', 'ぶるぶる', 'common', { b: 'sad', e: 'tiny', m: 'zigzag', c: 0, tint: 'pale', fx: ['sweatMany'], anim: 'trembleBig' });
   F('onsen', 'いいゆだな', 'common', { b: 'relaxed', e: 'closed', m: 'smile', c: 1, acc: ['towel'], fx: ['onsen'] });
-  F('osumashi', 'おすまし', 'common', { b: 'high', e: 'closed', m: 'tiny', c: 0.6, acc: ['flower'] });
-  F('chuu', 'ちゅー', 'common', { b: 'happy', e: 'closed', m: 'kiss', c: 1, fx: ['hearts'] });
+  F('osumashi', 'おすまし', 'common', { b: 'high', e: 'closed', m: 'tiny', c: 0.6, body: 'purple', acc: ['flower'] });
+  F('chuu', 'ちゅー', 'common', { b: 'happy', e: 'closed', m: 'kiss', c: 1, body: 'pink', fx: ['hearts'] });
   F('gege', 'げげっ', 'common', { b: 'worried', e: ['open', { pr: 0.3 }], m: 'grimace', c: 0, tint: 'green', fx: ['sweat'] });
   F('suppa', 'すっぱー', 'common', { b: 'worried', e: 'squeeze', m: 'pucker', c: 0, tint: 'yellow', fx: ['lemon'] });
   // レア(8)
@@ -467,6 +467,10 @@
         case 'arcUp':           // にこっ(^ ^)
           ctx.lineWidth = 0.065;
           ctx.beginPath(); ctx.moveTo(-r * 0.95, r * 0.35); ctx.quadraticCurveTo(0, -r * 1.05, r * 0.95, r * 0.35); ctx.stroke();
+          return;
+        case 'crescent':        // 塗りつぶしの にこっ目(◠)
+          ctx.fillStyle = INK;
+          ctx.beginPath(); ctx.moveTo(-r * 1.05, r * 0.35); ctx.quadraticCurveTo(0, -r * 1.35, r * 1.05, r * 0.35); ctx.quadraticCurveTo(0, -r * 0.45, -r * 1.05, r * 0.35); ctx.fill();
           return;
         case 'arcDown':         // すやっ(U U)
           ctx.lineWidth = 0.06;
@@ -1412,6 +1416,18 @@
           ctx.fillStyle = INK; ctx.fillRect(x - R * 0.01, y - R * 0.07, R * 0.02, R * 0.14);
           break;
         }
+        case 'sensu': {   // 扇子(落語)
+          ctx.save(); ctx.translate(R * 0.95, R * 0.25); ctx.rotate(-0.5 + Math.sin(t * 3) * 0.15);
+          for (i = 0; i < 7; i++) {
+            var a0 = -PI / 2 - 0.9 + i * 1.8 / 7;
+            ctx.fillStyle = i % 2 ? '#ffffff' : '#e84a6a';
+            ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, R * 0.42, a0, a0 + 1.8 / 7); ctx.closePath(); ctx.fill();
+          }
+          ctx.strokeStyle = INK; ctx.lineWidth = lw;
+          ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, R * 0.42, -PI / 2 - 0.9, -PI / 2 + 0.9); ctx.closePath(); ctx.stroke();
+          ctx.restore();
+          break;
+        }
         case 'onsen':     // ♨ のゆげ
           ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.lineWidth = Math.max(1.5, R * 0.045);
           for (i = -1; i <= 1; i++) {
@@ -1608,6 +1624,16 @@
       ctx.strokeStyle = '#4a8ad8'; ctx.lineWidth = Math.max(1, R * 0.025);
       ctx.beginPath(); ctx.moveTo(-R * 0.43, -R * 0.93); ctx.quadraticCurveTo(0, -R * 1.18, R * 0.43, -R * 0.93); ctx.stroke();
     }
+    if (has(acc, 'nightcap')) {   // ねぼすけ帽子
+      ctx.fillStyle = '#4a7ad8'; ctx.strokeStyle = INK; ctx.lineWidth = lw;
+      ctx.beginPath(); ctx.moveTo(-R * 0.5, -R * 0.8); ctx.quadraticCurveTo(0, -R * 1.25, R * 0.5, -R * 0.8);
+      ctx.quadraticCurveTo(R * 0.7, -R * 1.3, R * 1.0, -R * 1.05); ctx.quadraticCurveTo(R * 0.4, -R * 1.45, -R * 0.5, -R * 0.8); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = Math.max(1, R * 0.05);
+      ctx.beginPath(); ctx.moveTo(-R * 0.1, -R * 1.07); ctx.lineTo(R * 0.05, -R * 0.98); ctx.moveTo(R * 0.35, -R * 1.18); ctx.lineTo(R * 0.45, -R * 1.05); ctx.stroke();
+      ctx.fillStyle = '#ffffff'; ctx.strokeStyle = INK; ctx.lineWidth = lw;
+      ctx.beginPath(); ctx.ellipse(0, -R * 0.84, R * 0.55, R * 0.1, 0, 0, TAU); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.arc(R * 1.0, -R * 1.05, R * 0.11, 0, TAU); ctx.fill(); ctx.stroke();
+    }
     if (has(acc, 'flower')) {
       flower(ctx, R * 0.5, -R * 0.88, R * 0.17, '#ff8fc0', 0.3);
     }
@@ -1617,7 +1643,7 @@
   // 体の色
   var BODY = {
     red: ['#ef3a37', '#bf1d25'], fire: ['#ff2a1a', '#9e0a10'], gold: ['#ffe27a', '#c98f12'], white: ['#ffffff', '#d4cdc2'],
-    blue: ['#9ad6ff', '#3a7fd0'], stone: ['#bdb9b2', '#77736c'], soot: ['#6a2a24', '#2e100c'], pink: ['#ff9ac2', '#e0558f']
+    blue: ['#9ad6ff', '#3a7fd0'], yellow: ['#ffe24a', '#e0a010'], green: ['#5cd06a', '#1f8a3a'], purple: ['#b07ae0', '#5a2a9a'], black: ['#4a4450', '#141018'], stone: ['#bdb9b2', '#77736c'], soot: ['#6a2a24', '#2e100c'], pink: ['#ff9ac2', '#e0558f']
   };
   var FACE_COL = { angry: '#ffe9de', furious: '#ffd5c8', gold: '#fff2c8', stone: '#e4e2de', soot: '#e2d6c8', pale: '#eef6ff' };
 
@@ -1638,6 +1664,7 @@
     var deco = '#f2c53d', deco2 = '#a8700c';
     if (S.body === 'gold') { deco = '#c0392b'; deco2 = '#7a1a10'; }
     else if (S.body === 'blue') { deco = '#ffffff'; deco2 = '#4a8ad8'; }
+    else if (S.body === 'yellow') { deco = '#d0302a'; deco2 = '#7a1a10'; }
     else if (S.body === 'stone') { deco = '#8f8b84'; deco2 = '#5a5751'; }
     else if (S.body === 'soot') { deco = '#9a7a3a'; deco2 = '#5a4520'; }
     var P = { R: R, yaw: yaw, dir: dir, deco: deco, deco2: deco2, k: size < 70 ? 1.13 : 0 };
@@ -2231,12 +2258,21 @@
     }
     ctx.restore();
   }
-  // k 0〜1(弾けてから約1.2秒)。size は drawGoldenBalloon と同じ値(弾ける直前の だるまと ぴったり重なる)
+  // いま見えている範囲(canvas 全体を、いまの座標で)
+  function visibleArea(ctx) {
+    try {
+      var inv = ctx.getTransform().inverse(), W = ctx.canvas.width, H = ctx.canvas.height;
+      var a = inv.transformPoint({ x: 0, y: 0 }), b = inv.transformPoint({ x: W, y: H });
+      return { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(b.x - a.x), h: Math.abs(b.y - a.y) };
+    } catch (e) { return null; }
+  }
+  // k 0〜1(弾けてから約1.2秒)。opts.area = {x, y, w, h} で画面の範囲を渡すと、垂れ幕と「ドーン!」を その中に収める。size は drawGoldenBalloon と同じ値(弾ける直前の だるまと ぴったり重なる)
   function drawGoldenPop(ctx, cx, cy, size, k, opts) {
     opts = opts || {};
     if (!popParts) popParts = makePopParts();
     k = clamp(k || 0, 0, 1);
     var R = size / 2, t = opts.t || 0, tau = k * 1.2, spread = opts.spread || 1;
+    var area = opts.area || visibleArea(ctx);   // 画面の範囲(この範囲に垂れ幕と「ドーン!」を収める)
     var G1 = gbState(R, 1, t), dy = R * BOTTOM - gbY(BOTTOM, G1);
     var topY = gbY(-1, G1) + dy;                  // くす玉の てっぺん(ちょうつがい)
     var S = Math.max(size, 200) * 1.25 * spread;  // 紙吹雪のとぶ広さ
@@ -2296,11 +2332,33 @@
 
     // 垂れ幕
     var txt = opts.text == null ? '大当たり!' : String(opts.text);
+    var bt = opts.boomText == null ? 'ドーン!' : String(opts.boomText);
+    // 置き場所: 画面(area)の上から「ドーン!」→ その下に垂れ幕。垂れ幕は画面の 6割より下へ出ない
+    var nT = Math.max(1, txt.length), bw, fullL, bTop, boomY, fs;
+    if (area) {
+      var ay = area.y - cy, ah = area.h, aw = area.w;
+      fs = clamp(aw * 0.15, 30, 96);
+      if (bt) fs = Math.min(fs, aw * 0.85 / (bt.length * 0.95 * 1.1));
+      boomY = ay + ah * 0.07 + fs * 0.55;
+      var limTop = bt ? boomY + fs * 1.0 : ay + ah * 0.06, limBot = ay + ah * 0.6;
+      bw = clamp(size * 0.24, 38, Math.min(78, aw * 0.2));
+      fullL = bw * (nT * 0.82 + 0.6);
+      if (fullL > limBot - limTop) { bw = Math.max(18, (limBot - limTop) / (nT * 0.82 + 0.6)); fullL = bw * (nT * 0.82 + 0.6); }
+      bTop = Math.max(limTop, topY + R * 0.05);
+      if (bTop + fullL > limBot) bTop = Math.max(limTop, limBot - fullL);
+    } else {
+      bw = Math.max(36, size * 0.24); fullL = bw * (nT * 0.82 + 0.6); bTop = topY + R * 0.05;
+      fs = Math.max(44, size * 0.38); boomY = Math.min(oc - R * 1.1, bTop - fs * 0.8);
+    }
     var un = smooth((k - 0.1) / 0.35);
     if (un > 0 && txt) {
-      var bw = Math.max(36, size * 0.24), fullL = Math.max(120, bw * (txt.length * 0.82 + 0.6)), L = fullL * un;
+      var L = fullL * un;
       var sw = Math.sin(tau * 5) * 0.04 * (1 - un * 0.5);
-      ctx.save(); ctx.translate(0, topY + R * 0.05); ctx.rotate(sw);
+      if (bTop > topY + R * 0.06) {   // くす玉から垂れ幕まで ひも
+        ctx.strokeStyle = '#d9a520'; ctx.lineWidth = Math.max(2, bw * 0.06);
+        ctx.beginPath(); ctx.moveTo(0, area ? Math.max(topY, area.y - cy) : topY); ctx.lineTo(0, bTop); ctx.stroke();
+      }
+      ctx.save(); ctx.translate(0, bTop); ctx.rotate(sw);
       ctx.fillStyle = '#d9a520'; ctx.fillRect(-bw * 0.62, -bw * 0.06, bw * 1.24, bw * 0.12);
       ctx.save(); ctx.beginPath(); ctx.rect(-bw, 0, bw * 2, L); ctx.clip();
       ctx.fillStyle = '#fffaf0'; ctx.fillRect(-bw / 2, 0, bw, fullL);
@@ -2342,12 +2400,11 @@
     });
 
     // 「ドーン!」
-    var bt = opts.boomText == null ? 'ドーン!' : opts.boomText;
     if (bt && k > 0.02 && k < 0.5) {
-      var bk = (k - 0.02) / 0.48, sc = bk < 0.2 ? 0.4 + 0.9 * (bk / 0.2) : 1.3 - 0.15 * (bk - 0.2);
+      var bk = (k - 0.02) / 0.48, sc = bk < 0.2 ? 0.4 + 0.7 * (bk / 0.2) : 1.1 - 0.1 * (bk - 0.2);
       ctx.save(); ctx.globalAlpha = bk > 0.75 ? (1 - bk) / 0.25 : 1;
-      ctx.translate(0, oc - R * 1.1); ctx.rotate(-0.08); ctx.scale(sc, sc);
-      outlinedText(ctx, bt, 0, 0, Math.round(Math.max(44, size * 0.38)), '#ffe14d', '#c4320a', '"Hiragino Maru Gothic ProN","Arial Rounded MT Bold",sans-serif');
+      ctx.translate(0, boomY); ctx.rotate(-0.06); ctx.scale(sc, sc);
+      outlinedText(ctx, bt, 0, 0, Math.round(fs), '#ffe14d', '#c4320a', '"Hiragino Maru Gothic ProN","Arial Rounded MT Bold",sans-serif');
       ctx.restore();
     }
     // 白い閃光(はじめの 0.1)
