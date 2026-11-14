@@ -51,6 +51,15 @@
     return { best: +lsGet(C.BEST_KEY) || 0, bestDan: +lsGet(C.BEST_DAN_KEY) || 0, tutorialDone: lsGet(C.TUTORIAL_KEY) === '1',
       stats: { plays: st.plays || 0, totalDan: st.totalDan || 0, faces: st.faces || [], titles: st.titles || [], dajareUke: st.dajareUke || 0, hengaoOK: st.hengaoOK || 0 } };
   }
+  // 保存場所の記録と 今の記録を合わせる(高いほう・多いほうを残す)。
+  // ホーム画面のアプリと ブラウザなど 2か所で開いていると、古い画面が 低いベストで上書きしてしまうため(2026-11-14 ノブさん「最高得点が上がらない」)
+  function mergeRecords(a, b) {
+    function uni(x, y) { var o = (x || []).slice(); (y || []).forEach(function (v) { if (o.indexOf(v) < 0) o.push(v); }); return o; }
+    return { best: Math.max(a.best || 0, b.best || 0), bestDan: Math.max(a.bestDan || 0, b.bestDan || 0), tutorialDone: !!(a.tutorialDone || b.tutorialDone),
+      stats: { plays: Math.max(a.stats.plays, b.stats.plays), totalDan: Math.max(a.stats.totalDan, b.stats.totalDan), faces: uni(a.stats.faces, b.stats.faces),
+        titles: uni(a.stats.titles, b.stats.titles), dajareUke: Math.max(a.stats.dajareUke, b.stats.dajareUke), hengaoOK: Math.max(a.stats.hengaoOK, b.stats.hengaoOK) } };
+  }
+  function refreshRecords() { G.rec = mergeRecords(loadRecords(), G.rec); }
   function saveRecords(r) {
     lsSet(C.BEST_KEY, String(r.best)); lsSet(C.BEST_DAN_KEY, String(r.bestDan));
     lsSet(C.STATS_KEY, JSON.stringify(r.stats));
@@ -91,6 +100,7 @@
   function fmt(n) { return Math.round(n).toLocaleString('ja-JP'); }
 
   function toTitle() {
+    refreshRecords();
     G.mode = 'title'; G.paused = false; hideAll(); show('title', true);
     $('tBest').textContent = G.rec.best ? 'ベスト ' + fmt(G.rec.best) + ' 点 / 最高 ' + G.rec.bestDan + ' 段' : 'はじめての挑戦!';
     $('tDaily').textContent = '今日のだるまさん\n' + G.daily.line;
@@ -125,6 +135,7 @@
   function startGame(opts) {
     opts = opts || {};
     hideAll();
+    refreshRecords();
     var tutorial = opts.tutorial != null ? opts.tutorial : !G.rec.tutorialDone;
     var seed = opts.seed || ((Date.now() ^ (Math.random() * 1e9)) >>> 0);
     G.S = D.newGame({ seed: seed, tutorial: tutorial, firstPlay: G.rec.stats.plays === 0, daily: G.daily.mood });
@@ -295,6 +306,7 @@
     G.outInfo = { mood: S.out.mood, rush: S.out.t - watchStart < 0.5 };
   }
   function toResult() {
+    refreshRecords();
     var S = G.S, st = D.endStats(S), r = G.rec;
     var isBest = st.score > r.best, isBestDan = st.dan > r.bestDan;
     var prevBest = r.best;
@@ -549,6 +561,7 @@
       if (S.peek.caught) art = 'suspicious';
     }
     if (k === 'FROZEN' && ph.say && /あはは|くすくす/.test(ph.say)) art = 'laugh';
+    if (mood === 'gekido' && shake < 0.45) shake = 0.45;   // げきおこ: ぷるぷる ふるえる
     if (G.faceOver && G.at < G.faceOver.until) art = G.faceOver.mood;
     if (blind) art = 'blind';
     return { turn: turn, shake: shake, mood: art, look: look, k: k, blind: blind };
@@ -630,13 +643,13 @@
       drawBox(x + sh, y + 40, 110, 0);
       var step = Math.floor(Math.pow(a * 14, 0.8)) % 2;
       if (step === 0) text('むてき?', x, y - 70, 30, '#ffd84a', 'center', 900, '#1b1430', 6);
-      else safeDraw('drawHead', [ctx, x, y - 70, 90, { turn: 1, mood: 'furious', t: G.at, shadow: false }]);
+      else safeDraw('drawHead', [ctx, x, y - 70, 90, { turn: 1, mood: 'angry', t: G.at, shadow: false }]);
       text('なにが でるかな…', x, y + 120, 20, '#ffffff', 'center', 900, '#1b1430', 5);
     } else {        // パカッ
       var sc = Math.min(1, end / 0.15);
       drawBox(x, y + 40, 110, 1);
       if (M.result === 'muteki') { text('むてき!', x, y - 60, 48 * (0.6 + 0.4 * sc), '#ffd84a', 'center', 900, '#1b1430', 8); text('5びょう 見られても セーフ', x, y + 120, 18, '#ffffff', 'center', 900, '#1b1430', 5); }
-      else { safeDraw('drawHead', [ctx, x, y - 66, 110 * (0.6 + 0.4 * sc), { turn: 1, mood: 'furious', t: G.at, shadow: false }]); text('げきおこ!!', x, y + 112, 30, '#ff3030', 'center', 900, '#ffffff', 6); text('点数3倍・すぐ ふりむく', x, y + 146, 18, '#ffffff', 'center', 900, '#1b1430', 5); }
+      else { safeDraw('drawHead', [ctx, x, y - 66, 110 * (0.6 + 0.4 * sc), { turn: 1, mood: 'angry', t: G.at, shadow: false }]); text('げきおこ!!', x, y + 112, 30, '#ff3030', 'center', 900, '#ffffff', 6); text('点数3倍・すぐ ふりむく', x, y + 146, 18, '#ffffff', 'center', 900, '#1b1430', 5); }
     }
   }
   function drawFuse(cy) {

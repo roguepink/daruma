@@ -65,7 +65,7 @@
     nemui:   { name: 'ねむい',   art: 'sleepy',    color: '#8fb8ff', letter: [0.50, 0.75], jitter: 0.15, pauseP: 0.40, pause: [0.8, 1.6], restartP: 0,    tell: [1.20, 1.50], feintP: 0,    doubleP: 0,    facing: [0.8, 1.2], cycles: [3, 3], mult: 1.0, say: 'zzz…' },
     nakisou: { name: 'なきそう', art: 'sad',       color: '#7fd6e8', letter: [0.25, 0.60], jitter: null, pauseP: 0.20, pause: [0.5, 1.0], restartP: 0.30, tell: [0.80, 1.00], feintP: 0,    doubleP: 0,    facing: [2.0, 3.0], cycles: [3, 3], mult: 1.2, say: 'ぐすっ' },
     tere:    { name: 'てれ',     art: 'shy',       color: '#ff8fb0', letter: [0.32, 0.46], jitter: 0.15, pauseP: 0.25, pause: [0.4, 0.8], restartP: 0,    tell: [0.90, 1.10], feintP: 0,    doubleP: 0,    facing: [0.4, 0.7], cycles: [3, 3], mult: 1.0, say: 'えへへ' },
-    gekido:  { name: 'げきおこ', art: 'furious',   color: '#ff1a1a', letter: [0.08, 0.26], jitter: null, pauseP: 0.10, pause: [0.2, 0.5], restartP: 0,    tell: [0.60, 0.66], feintP: 0.30, doubleP: 0.25, facing: [1.4, 2.2], cycles: [99, 99], mult: 3.0, say: 'ぐぬぬ…' },
+    gekido:  { name: 'げきおこ', art: 'angry',   color: '#ff1a1a', letter: [0.08, 0.26], jitter: null, pauseP: 0.10, pause: [0.2, 0.5], restartP: 0,    tell: [0.60, 0.66], feintP: 0.30, doubleP: 0.25, facing: [1.4, 2.2], cycles: [99, 99], mult: 3.0, say: 'ぐぬぬ…' },
     bikkuri: { name: 'びっくり', art: 'surprised', color: '#ffe066', letter: [0, 0],       jitter: null, pauseP: 0,    pause: [0, 0],     restartP: 0,    tell: [0.60, 0.60], feintP: 0,    doubleP: 0,    facing: [1.2, 1.8], cycles: [1, 1], mult: 1.0, say: '!?' }
   };
   var MOOD_KEYS = ['futsu', 'gokigen', 'okori', 'ijiwaru', 'nemui', 'nakisou', 'tere', 'bikkuri'];
