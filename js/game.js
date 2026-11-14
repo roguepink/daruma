@@ -100,7 +100,7 @@
   var HOWTO = [
     ['むこうを むいている あいだに', 'トン!トン!', '下の大きいボタンで、いちばん下の段を叩いて落とそう'],
     ['赤い字が 出たら', '手を とめる', '「こ ろ ん だ」が赤くなったら、もうすぐ ふりむくよ'],
-    ['見ているときに おしたら', 'おしまい', 'くすぐる・ダジャレの ちょっかいで きぶんが かわるよ。見ている時は 顔をタッチで にらめっこ'],
+    ['見ているときに おしたら', 'おしまい', 'ちょっかいで きぶんが かわるよ\n見ている時は 顔をタッチ'],
     ['段の いろで', '点数が ちがう', '']
   ];
   function tableHTML() {
@@ -157,6 +157,8 @@
   // ------------------------------------------------------------------ 演出の部品
   function say(text, sec, col) { G.bubble = { text: text, until: G.at + (sec || 1.6), col: col || '#fffaf0', t0: G.at }; }
   function psay(text, sec) { G.pbubble = { text: text, until: G.at + (sec || 2), t0: G.at }; }
+  // ヒントを出してはいけない時(だるまさんが見そう・見ている・むてき中)
+  function tipBlocked(S) { var k = D.kindAt(S.d, S.t); return k === 'WARN' || k === 'FEINT' || k === 'GRACE' || k === 'WATCH' || k === 'PERFECT' || midWarn(S, S.t); }
   function tip(key, text) { if (G.tipsShown[key]) return; G.tipsShown[key] = true; G.tip = { text: text, until: G.at + 3.2, t0: G.at }; }
   function floatText(x, y, text, col, size, dur) { var o = { x: x, y: y, text: text, col: col || '#fff', size: size || 22, t0: G.at, dur: dur || 0.9 }; G.texts.push(o); return o; }
   function burst(x, y, col, n, spd) {
@@ -193,7 +195,7 @@
           if (e.k === 'WARN') { if (e.ph.dbl) say('…だっ!', 0.8, '#ffd0d0'); if (S.d.mood === 'bikkuri' && !e.ph.dbl) say(S.d.wakeUp ? 'はっ!ねてない!' : '!?', 0.9, '#fff3a0'); }
           if (e.k === 'GRACE' && !blind) sfx('turn');
           if (e.k === 'WATCH') {
-            if (!blind) { G.flash = 1; G.flashCol = '255,40,40'; G.shake = 0.35; floatText(HEAD.x + 70, 175, 'じーっ', '#ff4040', 26, 0.8); if (S.tutorial) say('見てるよ〜 さわらないでね', 1.4); }
+            if (!blind) { G.flash = 1; G.flashCol = '255,40,40'; G.shake = 0.35; floatText(HEAD.x + 104, 196, 'じーっ', '#ff4040', 24, 0.8); if (S.tutorial) say('見てるよ〜 さわらないでね', 1.4); }
             else { G.blindWatches = (G.blindWatches || 0) + 1; say(G.blindWatches >= 2 && G.lastRng() < 0.6 ? 'むむっ…木の においが する…!' : 'あれ?見えないよ〜', 1.6, '#e6dcff'); }
           }
           if (e.k === 'RETURN') sfx('back');
@@ -231,7 +233,7 @@
         case 'tooFast': G.swing = 1; sfx('tap'); break;
         case 'tama': floatText(46, 340, '玉 +1', '#ffe066', 20, 1.2); tip('tama', 'ちょっかいを つかってみよう!(下の3つ)'); break;
         case 'item':
-          sfx('item'); floatText(300, 360, D.ITEMS[e.item].name + ' ゲット!', '#fff3a0', 20, 1.4);
+          sfx('item'); floatText(195, 330, D.ITEMS[e.item].name + ' ゲット!', '#fff3a0', 20, 1.4);
           tip('item', e.item === 'shield' ? 'まもり:1回だけ 見つかっても セーフ!' : 'アイテムを ためしてみて!(右の わく)');
           break;
         case 'itemPoints': floatText(300, 360, '+100', '#fff3a0', 22, 1); break;
@@ -259,7 +261,7 @@
   function onDrop(e) {
     var S = G.S, b = e.block, col = blockColor(b.t);
     G.swing = 1; G.fall = Math.max(G.fall, (b.kind === 'double' ? 2 : 1) * C.BLOCK_H);
-    G.flyers.push({ kind: D.BLOCKS[b.t].art, x: 195, y: TOWER_BOTTOM - (b.kind === 'double' ? C.BLOCK_H : C.BLOCK_H / 2), vx: 520 + Math.random() * 120, vy: -120, rot: 0, vr: 5 + Math.random() * 3, age: 0, h: b.kind === 'double' ? C.BLOCK_H * 2 + 6 : C.BLOCK_H + 6 });
+    G.flyers.push({ kind: D.BLOCKS[b.t].art, x: 195, y: TOWER_BOTTOM - (b.kind === 'double' ? C.BLOCK_H : C.BLOCK_H / 2), vx: 520 + Math.random() * 100, vy: -720 - Math.random() * 120, rot: 0, vr: 5 + Math.random() * 3, age: 0, h: b.kind === 'double' ? C.BLOCK_H * 2 + 6 : C.BLOCK_H + 6 });
     burst(250, 498, col, e.auto ? 3 : 8, 180);
     if (!e.auto || Math.random() < 0.5) sfx(b.t === 'kin' || b.t === 'niji' ? 'gold' : 'drop');
     var hex = D.BLOCKS[b.t].hex;
@@ -314,7 +316,8 @@
     setTimeout(function () { ['btnAgain', 'btnShare', 'btnToTitle'].forEach(function (id) { $(id).disabled = false; }); }, 800);   // 連打の指で うっかり押さないように
     var tl = got.map(function (id) { for (var i = 0; i < D.TITLES.length; i++) if (D.TITLES[i].id === id) return D.TITLES[i]; }).filter(Boolean);
     var showT = news.length ? tl.filter(function (x) { return news.indexOf(x.id) >= 0; }) : tl.slice(-1);
-    $('rTitle').textContent = showT.length ? '称号: ' + showT.map(function (x) { return x.name; }).join('・') + (news.length ? ' (NEW)' : '') : '';
+    $('rTitle').textContent = news.length ? '称号: ' + showT.map(function (x) { return x.name; }).join('・') + ' (NEW)' : (nextT ? 'つぎの称号: ' + nextT.name + '(' + nextT.how + ')' : '称号を ぜんぶ とったよ!');
+    $('rNext').textContent = '';
     $('rFaces').textContent = '見たかお ' + r.stats.faces.length + ' / 9';
     if (isBest) sfx('best');
     AUDIO.bgm('result');
@@ -458,7 +461,7 @@
   bindBtn('btnQuit', function () {
     var b = $('btnQuit');
     if (b.dataset.armed === '1') { b.dataset.armed = ''; b.textContent = 'やめる'; toTitle(); return; }
-    b.dataset.armed = '1'; b.textContent = 'もう1回で やめる';
+    b.dataset.armed = '1'; b.textContent = 'もう1回 おす';
     setTimeout(function () { b.dataset.armed = ''; b.textContent = 'やめる'; }, 3000);
   });
   bindBtn('btnShare', function () {
@@ -753,7 +756,7 @@
     } else if (ph && ph.dbl) {
       text('だっ!', 46, 230, 40, blind ? '#9a6af0' : '#ff2a2a', 'center', 900, '#ffffff', 7);
     } else if (S.windowDrops > 0) {
-      text('この間', 46, 200, 16, '#ffffff', 'center', 900, '#1b1430', 4);
+      text('この回', 46, 200, 16, '#ffffff', 'center', 900, '#1b1430', 4);
       text(S.windowDrops + 'こ', 46, 232, 32, '#9be15d', 'center', 900, '#1b1430', 6);
       if (S.combo >= 2) {
         var cp = G.comboPop != null ? Math.max(0, 1 - (G.at - G.comboPop) / 0.4) : 0;
@@ -925,7 +928,7 @@
     if (G.bubble && G.at < G.bubble.until) bubbleBox(G.bubble.text, 300, headY - 66, 176, 17, G.bubble.col, 258, headY - 34);
     if (G.pbubble && G.at < G.pbubble.until) bubbleBox(G.pbubble.text, 112, 486, 200, 17, '#ffffff', 90, 532);
     var S = G.S;
-    if (G.tip && G.at < G.tip.until && D.kindAt(S.d, S.t) !== 'PERFECT') {
+    if (G.tip && G.at < G.tip.until && D.kindAt(S.d, S.t) !== 'PERFECT' && !tipBlocked(S)) {
       var a = Math.min(1, (G.tip.until - G.at) / 0.4);
       ctx.save(); ctx.globalAlpha = a;
       text(G.tip.text, 195, 611, 16, '#ffe066', 'center', 900, '#1b1430', 4);
@@ -958,7 +961,7 @@
     var st = tonState(S, t);
     if (G.bubble && G.at < G.bubble.until) return;
     var msg = st === 'ok' ? 'いまだよ!トン!トン!' : st === 'warn' ? 'とめて!' : st === 'watch' ? '見てるよ〜' : null;
-    if (G.tip && G.at < G.tip.until) return;
+    if (G.tip && G.at < G.tip.until && st === 'ok') return;   // 「とめて!」「見てるよ〜」はヒントより優先
     if (msg) text(msg, 195, 611, 16, st === 'ok' ? '#9be15d' : '#ff6060', 'center', 900, '#1b1430', 4);
   }
 
@@ -1101,6 +1104,7 @@
       G.fall = Math.max(0, G.fall - dt * 420);
       G.shake = Math.max(0, G.shake - dt * 2);
       G.flash = Math.max(0, G.flash - dt * 3);
+      if (G.tip && G.mode === 'play' && G.S && (G.paused || tipBlocked(G.S))) G.tip.until += dt;
       if (G.mode === 'play' && !G.paused) {
         if (G.countdown > 0) {
           G.countdown -= dt;
