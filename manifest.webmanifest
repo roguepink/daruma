@@ -30,5 +30,36 @@
       "purpose": "maskable"
     }
   ],
-  "screenshots": []
+  "screenshots": [
+    {
+      "src": "shots/1.jpg",
+      "sizes": "360x779",
+      "type": "image/jpeg",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "shots/2.jpg",
+      "sizes": "360x779",
+      "type": "image/jpeg",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "shots/3.jpg",
+      "sizes": "360x779",
+      "type": "image/jpeg",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "shots/4.jpg",
+      "sizes": "360x779",
+      "type": "image/jpeg",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "shots/5.jpg",
+      "sizes": "360x779",
+      "type": "image/jpeg",
+      "form_factor": "narrow"
+    }
+  ]
 }
