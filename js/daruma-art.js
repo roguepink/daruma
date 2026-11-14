@@ -228,7 +228,7 @@
   // eye : type open/arcUp/arcDown/squeeze/spiral/blank/none, lid=上まぶた 0〜1, lidAng=つり具合(+で内側が下がる=怒り),
   //       low=下まぶた, pr=黒目の大きさ, look=[x,y] 黒目の向き, size=目の大きさ, wet=うるうる
   var MOOD_LABELS = {
-    normal: 'ふつう', happy: 'にこにこ', laugh: '大笑い', angry: 'おこり', mean: 'いじわる', sleepy: 'ねむい',
+    normal: 'ふつう', happy: 'にこにこ', laugh: '大笑い', angry: 'おこり', furious: 'げきおこ', mean: 'いじわる', sleepy: 'ねむい',
     sad: 'なきそう', shy: 'てれ', surprised: 'びっくり', blind: '目かくし', dizzy: 'めがまわる', smug: 'ドヤ',
     suspicious: 'うたがい', oneeye: '片目(伝統)'
   };
@@ -254,6 +254,10 @@
         S.browL = B(0.05, -0.34, 0.44, -0.55, -0.02, 0.15);
         S.eyeL = E({ pr: 0.38, lid: 0.36, lidAng: 0.55, look: [0, 0.05] });
         S.mouth = 'grit'; S.cheek = 0; S.tint = 'angry'; break;
+      case 'furious': // (作る係が足した)げきおこ: おこりより 目が細く つり上がり、顔がもっと赤い
+        S.browL = B(0.04, -0.30, 0.45, -0.60, -0.04, 0.18);
+        S.eyeL = E({ pr: 0.34, lid: 0.48, lidAng: 0.75, look: [0, 0.05] });
+        S.mouth = 'grit'; S.cheek = 0; S.tint = 'angry'; S.furious = true; break;
       case 'mean':
         S.browL = B(0.06, -0.38, 0.43, -0.47, 0.0, 0.13);     // 見て左の眉: 下げる
         S.browR = B(0.07, -0.52, 0.42, -0.63, 0.13, 0.11);    // 見て右の眉: つり上げる
@@ -558,7 +562,7 @@
 
   // ---- 部品: ひげ(鼻の下の口ひげ と あごひげ) ----
   function drawMustache(ctx, P, s, mood, t) {
-    var lift = (mood === 'angry') ? -0.02 : (mood === 'laugh' || mood === 'happy') ? -0.025 : (mood === 'sad') ? 0.02 : 0;
+    var lift = (mood === 'angry' || mood === 'furious') ? -0.02 : (mood === 'laugh' || mood === 'happy') ? -0.025 : (mood === 'sad') ? 0.02 : 0;
     var wig = (mood === 'laugh') ? Math.sin(t * 24) * 0.012 : 0;
     feat(ctx, P, s * 0.19, 0.115, function () {
       ctx.fillStyle = INK;
@@ -692,11 +696,12 @@
     var i, p, x, y;
     ctx.save();
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-    if (mood === 'angry') {
-      // 湯気
-      for (i = 0; i < 4; i++) {
+    if (mood === 'angry' || mood === 'furious') {
+      // 湯気(げきおこは 2倍・速い)
+      var nSteam = mood === 'furious' ? 8 : 4;
+      for (i = 0; i < nSteam; i++) {
         var s = i % 2 ? 1 : -1;
-        p = fract(t * 0.9 + i * 0.25);
+        p = fract(t * (mood === 'furious' ? 1.6 : 0.9) + i / nSteam);
         x = s * (R * 0.42 + p * R * 0.3); y = -R * 0.88 - p * R * 0.65;
         var pr = R * (0.09 + p * 0.1);
         ctx.globalAlpha = (1 - p) * 0.9;
@@ -855,6 +860,7 @@
     if (mood === 'laugh') { oy = -Math.abs(Math.sin(t * 12)) * R * 0.05; rot = Math.sin(t * 12) * 0.05; }
     if (mood === 'dizzy') rot = Math.sin(t * 2.6) * 0.12;
     if (mood === 'angry') ox = Math.sin(t * 70) * R * 0.01;
+    if (mood === 'furious') { ox = Math.sin(t * 80) * R * 0.025; oy = Math.sin(t * 53) * R * 0.01; }
     if (mood === 'sad') ox = Math.sin(t * 45) * R * 0.005;
     if (mood === 'smug') rot = -0.07 * dir;
     if (mood === 'shy') rot = 0.05 * dir + Math.sin(t * 1.6) * 0.03;
@@ -881,6 +887,7 @@
     bodyPath(ctx, R);
     var base = ctx.createLinearGradient(0, -R, 0, R);
     if (mood === 'angry') { base.addColorStop(0, '#ff3b2f'); base.addColorStop(1, '#b3121c'); }
+    else if (mood === 'furious') { base.addColorStop(0, '#ff2414'); base.addColorStop(1, '#7a0008'); }
     else { base.addColorStop(0, '#ef3a37'); base.addColorStop(1, '#bf1d25'); }
     ctx.fillStyle = base; ctx.fill();
 
@@ -892,7 +899,7 @@
     if (Math.cos(yaw - PI) > 0.02) drawBack(ctx, P, opts);
 
     // 顔
-    var fc = mood === 'angry' ? '#ffe9de' : '#fffaf0';
+    var fc = mood === 'angry' ? '#ffe9de' : mood === 'furious' ? '#ffd0c0' : '#fffaf0';
     if (faceC > -0.6) {
       facePath(ctx, P);
       var fg = ctx.createRadialGradient(-R * 0.12, -R * 0.3, R * 0.05, 0, -R * 0.1, R * 0.75);
@@ -904,7 +911,8 @@
         var tg;
         if (S.tint === 'angry') {
           tg = ctx.createLinearGradient(0, -R * 0.6, 0, R * 0.2);
-          tg.addColorStop(0, 'rgba(255,40,30,' + (0.35 + 0.12 * Math.sin(t * 8)) + ')'); tg.addColorStop(1, 'rgba(255,60,40,0.08)');
+          var fu = S.furious ? 0.25 : 0;
+          tg.addColorStop(0, 'rgba(255,40,30,' + (0.35 + fu + 0.12 * Math.sin(t * 8)) + ')'); tg.addColorStop(1, 'rgba(255,60,40,' + (0.08 + fu) + ')');
         } else if (S.tint === 'mean') {
           tg = ctx.createLinearGradient(0, -R * 0.68, 0, -R * 0.3);
           tg.addColorStop(0, 'rgba(90,30,140,0.38)'); tg.addColorStop(1, 'rgba(90,30,140,0)');

@@ -151,7 +151,7 @@
     var k = D.kindAt(S.d, S.t);
     if (k === 'PERFECT') AUDIO.bgm('fever');
     else if ((k === 'WATCH' || k === 'GRACE') && !D.isBlind(S, S.t)) AUDIO.bgm(null);
-    else AUDIO.bgm(S.d.mood === 'okori' ? 'angry' : 'play');
+    else AUDIO.bgm(S.d.mood === 'okori' || S.d.mood === 'gekido' ? 'angry' : 'play');
   }
 
   // ------------------------------------------------------------------ 演出の部品
@@ -255,6 +255,16 @@
           sfx('best'); say('じょうず!ほんばん いくよ!', 2.2, '#fff3a0'); G.rec.tutorialDone = true; saveRecords(G.rec);
           break;
         case 'newFace': break;
+        case 'peek': sfx('shy'); G.peekText = floatText(HEAD.x - 92, (G.headY || 230) - 52, 'ちらっ', '#ff9ad0', 18, 0.8); break;
+        case 'peekCaught': sfx('warn'); faceOverride('suspicious', 1.3); say('ん?', 1.2, '#fff3a0'); break;
+        case 'mysteryOpen': G.mystery = { t0: G.at, result: null }; sfx('item'); break;
+        case 'mysteryResult':
+          if (G.mystery) { G.mystery.result = e.result; G.mystery.t1 = G.at; }
+          if (e.result === 'muteki') { sfx('best'); say('え〜!? ずるい〜', 1.6); }
+          else { sfx('angry'); G.shake = 0.7; G.flash = 0.8; G.flashCol = '200,0,0'; say('ゆるさなーい!!', 1.6, '#ffc0b0'); }
+          moodBgm();
+          break;
+        case 'mutekiSave': sfx('shield'); say('ずるい!', 1.0, '#fff3a0'); break;
       }
     }
   }
@@ -318,7 +328,7 @@
     var showT = news.length ? tl.filter(function (x) { return news.indexOf(x.id) >= 0; }) : tl.slice(-1);
     $('rTitle').textContent = news.length ? '称号: ' + showT.map(function (x) { return x.name; }).join('・') + ' (NEW)' : (nextT ? 'つぎの称号: ' + nextT.name + '(' + nextT.how + ')' : '称号を ぜんぶ とったよ!');
     $('rNext').textContent = '';
-    $('rFaces').textContent = '見たかお ' + r.stats.faces.length + ' / 9';
+    $('rFaces').textContent = '見たかお ' + r.stats.faces.length + ' / ' + D.FACE_KEYS.length;
     if (isBest) sfx('best');
     AUDIO.bgm('result');
   }
@@ -395,6 +405,7 @@
       }
       if (e.type === 'noSleep') say('ねられるか!', 1.4, '#ffd0c8');
     });
+    handle(evs.filter(function (e) { return e.type !== 'useItem' && e.type !== 'noSleep'; }));
     moodBgm();
   }
   function onDown(ev) {
@@ -531,6 +542,12 @@
     else if (k === 'RETURN') turn = 1 - p;
     else if (k === 'PERFECT') { art = 'laugh'; }
     else if (midWarn(S, t)) { turn = 0.35; }
+    else if (S.peek && t >= S.peek.s && t < S.peek.e && k === 'SAFE') {   // チラ見: 肩ごしに ちらっ(赤い字なし・頭だけ少し・かわいい顔)
+      var pq = (t - S.peek.s) / (S.peek.e - S.peek.s);
+      turn = 0.42 * Math.sin(Math.min(1, pq) * Math.PI); G.peekDir = -1;   // 本物の振り向き(右から)とは 反対の肩から
+      if (mood !== 'okori' && mood !== 'gekido' && mood !== 'ijiwaru') art = 'shy';
+      if (S.peek.caught) art = 'suspicious';
+    }
     if (k === 'FROZEN' && ph.say && /あはは|くすくす/.test(ph.say)) art = 'laugh';
     if (G.faceOver && G.at < G.faceOver.until) art = G.faceOver.mood;
     if (blind) art = 'blind';
@@ -538,7 +555,7 @@
   }
 
   // ------------------------------------------------------------------ 描画(遊んでいる画面)
-  function themeFor(mood) { return mood === 'okori' ? 'yuyake' : mood === 'nemui' ? 'yoru' : 'washitsu'; }
+  function themeFor(mood) { return mood === 'okori' || mood === 'gekido' ? 'yuyake' : mood === 'nemui' ? 'yoru' : 'washitsu'; }
 
   function drawTowerAndHead(S, t, opt) {
     opt = opt || {};
@@ -574,7 +591,8 @@
     var size = HEAD.size, hy = topY - size * headBottom();
     if (opt.headY != null) { hy = opt.headY; size = opt.headSize; }
     if (pose.k === 'PERFECT' || G.mode === 'out') { /* そのまま */ }
-    var hopts = { turn: opt.turn != null ? opt.turn : pose.turn, mood: opt.mood || pose.mood, t: G.at, shake: pose.shake, dir: 1 };
+    var peeking = S.peek && t >= S.peek.s && t < S.peek.e && pose.k === 'SAFE';
+    var hopts = { turn: opt.turn != null ? opt.turn : pose.turn, mood: opt.mood || pose.mood, t: G.at, shake: pose.shake, dir: peeking ? -1 : 1 };
     safeDraw('drawHead', [ctx, HEAD.x, hy, size, hopts]);
     G.headY = hy;
     if (G.mode === 'play' && hopts.turn < 0.6 && !pose.blind) drawBackSign(S.d.mood, hy);
@@ -588,6 +606,38 @@
       ctx.restore();
     }
     return { headY: hy, topY: topY };
+  }
+  // ミステリーボックス(?の箱)。open = 0〜1 で ふたが開く
+  function drawBox(x, y, sz, open) {
+    var h = sz * 0.8;
+    ctx.save(); ctx.translate(x, y);
+    ctx.fillStyle = '#8a4fd8'; ctx.strokeStyle = '#1b1430'; ctx.lineWidth = Math.max(2, sz * 0.06);
+    rr(-sz / 2, -h / 2 + sz * 0.12, sz, h - sz * 0.12, sz * 0.12); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#ffd84a'; ctx.fillRect(-sz * 0.08, -h / 2 + sz * 0.12, sz * 0.16, h - sz * 0.12);
+    ctx.save(); ctx.translate(-sz * 0.56, -h / 2 + sz * 0.12); ctx.rotate(-open * 1.1);
+    ctx.fillStyle = '#a26aee'; rr(0, -sz * 0.2, sz * 1.12, sz * 0.24, sz * 0.08); ctx.fill(); ctx.stroke(); ctx.restore();
+    if (open < 0.5) text('?', 0, sz * 0.12, sz * 0.5, '#ffffff', 'center', 900, '#1b1430', Math.max(3, sz * 0.08));
+    ctx.restore();
+  }
+  function drawMystery() {
+    var M = G.mystery; if (!M) return;
+    var a = G.at - M.t0, end = M.t1 ? G.at - M.t1 : 0;
+    if (M.t1 && end > 0.9) { G.mystery = null; return; }
+    ctx.save(); ctx.fillStyle = 'rgba(10,6,24,' + (M.t1 ? 0.45 * (1 - end / 0.9) : 0.45) + ')'; ctx.fillRect(-200, -200, W + 400, H + 400); ctx.restore();
+    var x = 195, y = 360;
+    if (!M.t1) {   // ガタガタ + 顔のルーレット(だんだん ゆっくり)
+      var sh = Math.sin(a * 60) * 6 * Math.min(1, a * 2);
+      drawBox(x + sh, y + 40, 110, 0);
+      var step = Math.floor(Math.pow(a * 14, 0.8)) % 2;
+      if (step === 0) text('むてき?', x, y - 70, 30, '#ffd84a', 'center', 900, '#1b1430', 6);
+      else safeDraw('drawHead', [ctx, x, y - 70, 90, { turn: 1, mood: 'furious', t: G.at, shadow: false }]);
+      text('なにが でるかな…', x, y + 120, 20, '#ffffff', 'center', 900, '#1b1430', 5);
+    } else {        // パカッ
+      var sc = Math.min(1, end / 0.15);
+      drawBox(x, y + 40, 110, 1);
+      if (M.result === 'muteki') { text('むてき!', x, y - 60, 48 * (0.6 + 0.4 * sc), '#ffd84a', 'center', 900, '#1b1430', 8); text('5びょう 見られても セーフ', x, y + 120, 18, '#ffffff', 'center', 900, '#1b1430', 5); }
+      else { safeDraw('drawHead', [ctx, x, y - 66, 110 * (0.6 + 0.4 * sc), { turn: 1, mood: 'furious', t: G.at, shadow: false }]); text('げきおこ!!', x, y + 112, 30, '#ff3030', 'center', 900, '#ffffff', 6); text('点数3倍・すぐ ふりむく', x, y + 146, 18, '#ffffff', 'center', 900, '#1b1430', 5); }
+    }
   }
   function drawFuse(cy) {
     ctx.save();
@@ -658,6 +708,9 @@
         for (i = 0; i < 2; i++) { u = (a * 0.8 + i * 0.5) % 1; ctx.globalAlpha = 1 - u; ctx.fillStyle = '#7fd6ff'; ctx.beginPath(); ctx.ellipse(x + (i ? 78 : -78), top + 60 + u * 40, 5, 8, 0, 0, 6.283); ctx.fill(); }
         ctx.globalAlpha = 1; text('ぐすん', x + 92, top + 22, 17, '#7fd6ff', 'center', 900, '#1b1430', 4); break;
       case 'tere': for (i = 0; i < 2; i++) { u = (a * 0.5 + i * 0.5) % 1; ctx.globalAlpha = 1 - u; heart(x + (i ? 86 : -86), top + 50 - u * 40, 24, '#ff6f9f'); } break;
+      case 'gekido':
+        for (i = 0; i < 5; i++) { u = (a * 1.6 + i / 5) % 1; ctx.globalAlpha = 0.9 * (1 - u); ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(x + (i - 2) * 26, top + 12 - u * 44, 9 + u * 12, 0, 6.283); ctx.fill(); }
+        ctx.globalAlpha = 1; text('ゴゴゴ', x + 92 + Math.sin(a * 30) * 2, top + 26, 20, '#ff1a1a', 'center', 900, '#1b0000', 5); break;
       case 'bikkuri': text('!!', x + 86, top + 26 - Math.abs(Math.sin(a * 8)) * 8, 32, '#ffe066', 'center', 900, '#1b1430', 5); break;
     }
     ctx.restore();
@@ -780,6 +833,8 @@
     if (S.doubleUntil > S.t) items.push(['2倍', Math.ceil(S.doubleUntil - S.t) + '', '#d88a10']);
     if (S.malletHits > 0) items.push(['金づち', S.malletHits + '', '#c89010']);
     if (S.shield > 0) items.push(['まもり', '', '#3aa0c8']);
+    if (S.mutekiUntil > S.t) items.push(['むてき', S.mutekiUntil > S.t + 99 ? '' : Math.ceil(S.mutekiUntil - S.t) + '', '#d8a010']);
+    if (S.d.mood === 'gekido') items.push(['×3', '', '#c01010']);
     for (var i = 0; i < items.length; i++) {
       var it = items[i];
       ctx.save(); ctx.fillStyle = it[2]; ctx.globalAlpha = 0.95; rr(3, y, 88, 28, 14); ctx.fill(); ctx.restore();
@@ -805,6 +860,7 @@
         ctx.fillStyle = 'rgba(255,250,236,0.97)'; rr(r.x, r.y, r.w, r.h, 12); ctx.fill();
         ctx.strokeStyle = can ? '#ffcc00' : '#888'; ctx.lineWidth = can ? 4 : 3; ctx.stroke();
         if (info.art) safeDraw('drawItem', [ctx, cx, r.y + 27, 40, info.art === 'perfect' ? 'perfect' : info.art, G.at]);
+        else if (it === 'mystery') drawBox(cx, r.y + 28, 36, 0);
         else {
           ctx.fillStyle = it === 'perfect' ? 'hsl(' + (40 + Math.sin(G.at * 3) * 30 + 300) % 360 + ',85%,62%)' : info.color;
           ctx.beginPath(); ctx.arc(cx, r.y + 27, 20, 0, 6.283); ctx.fill();
@@ -853,6 +909,7 @@
     if (k === 'PERFECT') return 'perfect';
     if (D.isDanger(k) || k === 'FEINT') {
       if (blind) return 'blind';
+      if (t < S.mutekiUntil) return 'muteki';
       if (k === 'WARN' || k === 'FEINT') return 'warn';
       return 'watch';
     }
@@ -866,6 +923,7 @@
     else if (st === 'warn') { fill = '#ffd23f'; label = 'とめて!'; border = '#e01010'; bw = 9 + pulse * 3; grow = pulse * 4; }
     else if (st === 'watch') { fill = '#e5221b'; label = 'さわらないで!'; col = '#ffffff'; border = '#7a0000'; bw = 6; }
     else if (st === 'blind') { fill = '#c9b6f2'; label = '見えてないよ'; }
+    else if (st === 'muteki') { fill = '#ffd84a'; label = 'むてき!'; border = '#a06000'; bw = 6; }
     else if (st === 'wait') { fill = '#9a94a8'; label = 'まってね'; }
     else {   // パーフェクト: 桃と金(赤には しない)
       var gg = ctx.createLinearGradient(r.x, 0, r.x + r.w, 0), sh = (G.at * 0.6) % 1;
@@ -892,6 +950,8 @@
     if (st === 'warn') a = 0.5 + 0.12 * pulse;
     else if (st === 'watch') a = 0.62;
     else if (st === 'blind') { a = 0.28; col = '150,110,230'; }
+    else if (st === 'muteki') { a = 0.3; col = '255,210,60'; }
+    else if (S.d.mood === 'gekido') { a = 0.32 + 0.14 * pulse; col = '120,0,0'; }   // げきおこ: 赤黒く 脈打つ
     else if (D.kindAt(S.d, t) === 'STOP') { a = 0.3; col = '150,200,255'; }
     if (a <= 0) return;
     ctx.save();
@@ -996,6 +1056,7 @@
     drawBubbles(hp.headY);
     drawPractice(S, t);
     drawVignette(S, t);
+    drawMystery();
     ctx.restore();
     if (G.countdown > 0) {
       ctx.save(); ctx.fillStyle = 'rgba(10,6,24,0.45)'; ctx.fillRect(-200, -200, W + 400, H + 400); ctx.restore();
@@ -1078,8 +1139,8 @@
     safeDraw('drawHead', [ctx, 195, 92, 120, { turn: 1, mood: r.face, t: G.at, oneEye: r.oneEye }]);
     // 見たかお(9つ)
     var faces = G.rec.stats.faces;
-    for (var i = 0; i < 9; i++) {
-      var key = D.FACE_KEYS[i], x = 51 + i * 36, y = 528, seen = faces.indexOf(key) >= 0;
+    for (var i = 0; i < D.FACE_KEYS.length; i++) {
+      var key = D.FACE_KEYS[i], x = 195 + (i - (D.FACE_KEYS.length - 1) / 2) * 34, y = 528, seen = faces.indexOf(key) >= 0;
       if (seen) safeDraw('drawHead', [ctx, x, y, 30, { turn: 1, mood: key === 'mekakushi' ? 'blind' : D.MOODS[key].art, t: 0, shadow: false }]);
       else { ctx.save(); ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.beginPath(); ctx.arc(x, y, 14, 0, 6.283); ctx.fill(); ctx.restore(); text('?', x, y + 1, 14, 'rgba(255,255,255,0.6)', 'center', 900); }
     }

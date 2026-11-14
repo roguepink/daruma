@@ -42,7 +42,12 @@
     TICKLE_PAUSE: 0.8, DAJARE_PAUSE: 1.5, OCHA_PAUSE: 1.0, LULLABY_SEC: 1.5, OCHA_FACING_MUL: 0.5,
     HAGAO_SUCCESS: 0.65, HAGAO_CUT: 0.30, HAGAO_FAIL_ADD: 0.5,
     ITEM_SLOTS: 2, BLINDFOLD_SEC: 5, BLINDFOLD_WARN: 1.0,
-    PERFECT_SEC: 5, PERFECT_DROP_RATE: 3.5, PERFECT_TAP_DROPS: 2, HENGAO_COOLDOWN: 12, TICKLE_MOOD_CYCLES: 1, TIMESTOP_SEC: 4, DOUBLE_SCORE_SEC: 15, GOLD_MALLET_HITS: 10,
+    // 2026-11-14 ノブさんの直し: スリル(気分を問わず たまに)・チラ見・ミステリーボックス・げきおこ
+    SPICE_FEINT: 0.10, SPICE_FAST: 0.12, SPICE_DOUBLE: 0.08,      // 気分の確率に足す
+    FAST_LETTER_MUL: 0.35, FAST_LETTER_MIN: 0.06, TELL_MIN_FAST: 0.53,   // 早口: 予兆+猶予 = 0.65 秒以上
+    PEEK_EVERY: [15, 25], PEEK_DUR: 0.4, PEEK_SAFE_LEFT: 0.7, PEEK_SPEEDUP: 0.6, PEEK_TUTORIAL_AT: 7,
+    MYSTERY_REVEAL: 1.0, MUTEKI_SEC: 5, GEKIDO_SEC: [8, 10], MYSTERY_MUTEKI_P: 0.5,
+    PERFECT_SEC: 5, PERFECT_DROP_RATE: 3.5, PERFECT_TAP_DROPS: 2, HENGAO_COOLDOWN: 12, TICKLE_MOOD_CYCLES: 1, TIMESTOP_SEC: 3, DOUBLE_SCORE_SEC: 10, GOLD_MALLET_HITS: 6,
     // 演出
     OUT_FREEZE: 0.25, OUT_TOTAL: 1.6, RESUME_COUNT: 3,
     // 記録
@@ -60,10 +65,11 @@
     nemui:   { name: 'ねむい',   art: 'sleepy',    color: '#8fb8ff', letter: [0.50, 0.75], jitter: 0.15, pauseP: 0.40, pause: [0.8, 1.6], restartP: 0,    tell: [1.20, 1.50], feintP: 0,    doubleP: 0,    facing: [0.8, 1.2], cycles: [3, 3], mult: 1.0, say: 'zzz…' },
     nakisou: { name: 'なきそう', art: 'sad',       color: '#7fd6e8', letter: [0.25, 0.60], jitter: null, pauseP: 0.20, pause: [0.5, 1.0], restartP: 0.30, tell: [0.80, 1.00], feintP: 0,    doubleP: 0,    facing: [2.0, 3.0], cycles: [3, 3], mult: 1.2, say: 'ぐすっ' },
     tere:    { name: 'てれ',     art: 'shy',       color: '#ff8fb0', letter: [0.32, 0.46], jitter: 0.15, pauseP: 0.25, pause: [0.4, 0.8], restartP: 0,    tell: [0.90, 1.10], feintP: 0,    doubleP: 0,    facing: [0.4, 0.7], cycles: [3, 3], mult: 1.0, say: 'えへへ' },
+    gekido:  { name: 'げきおこ', art: 'furious',   color: '#ff1a1a', letter: [0.08, 0.26], jitter: null, pauseP: 0.10, pause: [0.2, 0.5], restartP: 0,    tell: [0.60, 0.66], feintP: 0.30, doubleP: 0.25, facing: [1.4, 2.2], cycles: [99, 99], mult: 3.0, say: 'ぐぬぬ…' },
     bikkuri: { name: 'びっくり', art: 'surprised', color: '#ffe066', letter: [0, 0],       jitter: null, pauseP: 0,    pause: [0, 0],     restartP: 0,    tell: [0.60, 0.60], feintP: 0,    doubleP: 0,    facing: [1.2, 1.8], cycles: [1, 1], mult: 1.0, say: '!?' }
   };
   var MOOD_KEYS = ['futsu', 'gokigen', 'okori', 'ijiwaru', 'nemui', 'nakisou', 'tere', 'bikkuri'];
-  var FACE_KEYS = MOOD_KEYS.concat(['mekakushi']);   // 見たかお 図鑑(9つ)
+  var FACE_KEYS = MOOD_KEYS.concat(['gekido', 'mekakushi']);   // 見たかお 図鑑(10)
   var MOOD_DRIFT = [
     { futsu: 60, gokigen: 30, nemui: 10 },
     { futsu: 45, gokigen: 20, nemui: 10, ijiwaru: 15, tere: 10 },
@@ -97,7 +103,7 @@
   ];
   var TUTORIAL_WEIGHTS = { aka: 60, ao: 25, midori: 15 };
 
-  var ITEM_POOL = { mekakushi: 30, ocha: 12, odateru: 8, komoriuta: 8, shield: 6, kizuchi: 12, bai: 12, tokei: 8, perfect: 10 };
+  var ITEM_POOL = { mekakushi: 30, ocha: 12, odateru: 8, komoriuta: 8, shield: 6, kizuchi: 8, bai: 10, tokei: 8, mystery: 10 };   // パーフェクトは やめた(強すぎる)
   var ITEMS = {
     mekakushi: { name: '目かくし',   short: '目かくし', art: 'blindfold', mark: '目', color: '#4a5fc0', desc: '5びょう 見えなくなる' },
     ocha:      { name: 'お茶',       short: 'お茶',   art: null, mark: '茶', color: '#3f8f4a', desc: 'きぶんが おちつく' },
@@ -107,7 +113,8 @@
     kizuchi:   { name: '金の木づち', short: '金づち', art: 'perfect', mark: '槌', color: '#e0a820', desc: '10回 つよく叩く' },
     bai:       { name: '点数2倍',    short: '2倍',    art: null, mark: '倍', color: '#e8a020', desc: '15びょう 点数2倍' },
     tokei:     { name: '時間止め',   short: 'とめる', art: null, mark: '止', color: '#6a8ab8', desc: '4びょう かたまる' },
-    perfect:   { name: 'パーフェクト', short: 'むてき', art: null, mark: '極', color: '#ff5fa0', desc: '5びょう 落としまくり' }
+    perfect:   { name: 'パーフェクト', short: 'むてき', art: null, mark: '極', color: '#ff5fa0', desc: '(つかわない)' },
+    mystery:   { name: 'ミステリーボックス', short: 'はこ', art: null, mark: '?', color: '#8a4fd8', desc: 'むてき? げきおこ? あけてみないと わからない' }
   };
   var CHOTTO = {
     kusuguru: { name: 'くすぐる', cost: 1, art: 'feather' },
@@ -116,7 +123,7 @@
     hengao:   { name: '変顔',     cost: 0, art: null }
   };
   var CHOTTO_KEYS = ['kusuguru', 'dajare', 'ijiwaru'];   // 下のボタン。変顔は だるまさんの顔をタッチ
-  var DAJARE_UKE = { futsu: 0.60, gokigen: 0.85, okori: 0.25, ijiwaru: 0.40, nemui: 0.50, nakisou: 0.70, tere: 0.60, bikkuri: 0.30 };
+  var DAJARE_UKE = { gekido: 0.10, futsu: 0.60, gokigen: 0.85, okori: 0.25, ijiwaru: 0.40, nemui: 0.50, nakisou: 0.70, tere: 0.60, bikkuri: 0.30 };
   var DAJARE = [
     'ふとんが ふっとんだ', 'アルミ缶の上に ある ミカン', 'イクラは いくら?', 'カエルが かえる', 'パンダの パンだ',
     '電話に でんわ', 'だるまが だるーまった', 'ネコが ねころんだ', 'トイレに いっといれ', '内容が ないよう',
@@ -128,6 +135,7 @@
   var LINES = {
     ijiwaru: ['ひっかかったね〜 ひひひ', 'いま 叩いたでしょ〜?', 'ふりむくと 思わなかった?'],
     okori:   ['見てたぞ!ぜーんぶ!', 'こらーっ!', 'おこってるって 言ったでしょ!'],
+    gekido:  ['げきおこ だって 言ったでしょ!!', 'ぜったい 見のがさないぞ!!', 'こわかった? ふんっ!'],
     bikkuri: ['びっくりさせないでよ〜!', 'ドカンは ずるいよ〜', 'しんぞうが とまるかと…'],
     nemui:   ['ねてないよ…ほんとだよ…', 'うとうと…はっ!見えた!', 'ねむくても 見えるんだよ'],
     antic:   ['まだ こっち見てるよ?', 'あわてんぼうさん!', 'もどるまで まってね'],
@@ -209,15 +217,19 @@
       var base = rRange(rng, m.letter);
       var one = function () { return (m.jitter == null ? rRange(rng, m.letter) : base * rRange(rng, [1 - m.jitter, 1 + m.jitter])) * lmul; };
       var from = clamp(o.from || 0, 0, 6);
+      var spice = !o.warm && !o.tutorial;
+      var fast = spice && from === 0 && rng() < CONFIG.SPICE_FAST;      // 早口「だるまさんがころんだ!」
+      if (fast) one = function () { return Math.max(CONFIG.FAST_LETTER_MIN, base * CONFIG.FAST_LETTER_MUL * lmul); };
       var sp = push('SAFE', 0), i, k;
+      if (fast) sp.fast = true;
       if (from > 0) sp.L.push({ at: t, i: from - 1, silent: true });   // 言い終わった字は そのまま
       // 言い直し「だ…だる…」(はじめから言うときだけ)
-      if (from === 0 && rng() < m.restartP) {
+      if (from === 0 && !fast && rng() < m.restartP) {
         var n = rInt(rng, 2, 4);
         for (i = 0; i < n; i++) { sp.L.push({ at: t, i: i }); t += one(); }
         sp.stutter = true;
       }
-      var pauseAt = rng() < m.pauseP ? rInt(rng, Math.max(from, 1), 5) : -1;   // この文字の前で止まる
+      var pauseAt = !fast && rng() < m.pauseP ? rInt(rng, Math.max(from, 1), 5) : -1;   // この文字の前で止まる
       for (i = from; i < 6; i++) {
         if (i === pauseAt) {
           sp.e = t;
@@ -229,7 +241,7 @@
       }
       sp.e = t;
       // フェイント「ころ…なんちゃって」→「さんが」から言い直し
-      if (!o.warm && !o.tutorial && rng() < m.feintP) {
+      if (spice && !fast && rng() < m.feintP + CONFIG.SPICE_FEINT) {
         var fd = rRange(rng, CONFIG.FEINT_LETTERS_DUR);
         var fp = push('FEINT', fd); fp.L.push({ at: fp.s, i: 6 }, { at: fp.s + fd / 2, i: 7 });
         var s2 = push('SAFE', 0); s2.say = 'なんちゃって'; s2.L.push({ at: t, i: 2, silent: true });
@@ -239,12 +251,13 @@
       }
       var tell = rRange(rng, m.tell) * ((1 - CONFIG.TELL_SPEED_K) + CONFIG.TELL_SPEED_K * spd) + (o.warm ? CONFIG.WARMUP_TELL_ADD : 0);
       if (o.tutorial) tell *= CONFIG.TUTORIAL_TELL_MUL;
-      warn(Math.max(CONFIG.TELL_MIN, tell), false);
+      if (fast) { var fw = warn(CONFIG.TELL_MIN_FAST, false); fw.fast = true; }   // 早口でも 予兆+猶予は 0.65 秒
+      else warn(Math.max(CONFIG.TELL_MIN, tell), false);
     }
     var g = push('GRACE', CONFIG.GRACE); g.L.push({ at: g.s, i: 9 });
     push('WATCH', rRange(rng, m.facing) * ((1 - CONFIG.FACING_SPEED_K) + CONFIG.FACING_SPEED_K * spd));
     push('RETURN', CONFIG.RETURN_DUR);
-    if (!o.warm && !o.tutorial && rng() < m.doubleP + CONFIG.LATE_DOUBLE_ADD * Math.max(0, stage - 6)) {
+    if (!o.warm && !o.tutorial && rng() < m.doubleP + CONFIG.SPICE_DOUBLE + CONFIG.LATE_DOUBLE_ADD * Math.max(0, stage - 6)) {
       var ds = push('SAFE', CONFIG.DOUBLE_GAP); ds.say = '…';
       warn(CONFIG.TELL_MIN, true);
       push('GRACE', CONFIG.GRACE);
@@ -318,12 +331,18 @@
     setMoodRaw(d, nm, rInt(rng, MOODS[nm].cycles[0], MOODS[nm].cycles[1]));
   }
   function setMoodRaw(d, mood, cycles) {
-    if (d.mood !== 'bikkuri') d.prev = d.mood;
+    if (d.mood !== 'bikkuri' && d.mood !== 'gekido') d.prev = d.mood;
     d.mood = mood; d.left = cycles;
   }
   // 次の1回を足す(回数が終わったら 気分を変える)
   function nextCycle(S, t0) {
     var d = S.d;
+    if (d.mood === 'gekido') {
+      d.started = true;
+      if (t0 >= (S.gekidoUntil || 0)) setMoodRaw(d, 'okori', 2);   // げきおこが おさまって おこり
+      addCycle(S, t0, 0);
+      return;
+    }
     if (d.started) { d.left--; d.wakeUp = false; if (d.left <= 0) changeMoodNatural(S); }
     d.started = true;
     addCycle(S, t0, 0);
@@ -402,6 +421,14 @@
     var by = ne - p.e; p.e = ne;
     shiftAfter(d, idx + 1, by);
     return true;
+  }
+  // 今の向こう向き(SAFE)の のこりを ちぢめる(チラ見で うたがわれた)。予兆には さわらない
+  function compressSafe(S, t, f) {
+    var d = S.d, idx = phaseIndex(d, t);
+    if (idx < 0 || d.ph[idx].k !== 'SAFE') return;
+    var p = d.ph[idx], ne = t + (p.e - t) * f;
+    for (var j = 0; j < p.L.length; j++) if (p.L[j].at > t) p.L[j].at = t + (p.L[j].at - t) * f;
+    var by = ne - p.e; p.e = ne; shiftAfter(d, idx + 1, by);
   }
   // 次のこっち向きを短く(お茶)
   function scaleNextWatch(S, t, mul) {
@@ -522,6 +549,7 @@
       tower: [], blockReadyAt: 0, bst: { sinceRainbow: 0, sinceBomb: 99, firstRainbow: false, rainbows: 0 },
       d: newDaruma('futsu'),
       tama: CONFIG.TAMA_START, tamaCounter: 0, teaseReadyAt: 0, lastUsed: {}, hengaoPh: null,
+      mutekiUntil: -1, gekidoUntil: -1, pendingMystery: null, peek: null, nextPeekAt: opts.tutorial ? CONFIG.PEEK_TUTORIAL_AT : 0, peeks: 0,
       slots: [null, null], shield: 0, blindUntil: -1, malletHits: 0, doubleUntil: -1, perfAcc: 0,
       lastHitAt: -9, out: null,
       counts: { gold: 0, bomb: 0, okoriDrops: 0, nemuiDrops: 0, hengaoOK: 0, dajareUke: 0, perfects: 0, shieldSaves: 0 },
@@ -564,6 +592,29 @@
     if (isBlind(S, t1) && isDanger(k)) {
       var idx = phaseIndex(S.d, t1);
       for (var j = idx; j < S.d.ph.length; j++) if (S.d.ph[j].k === 'RETURN') { S.blindUntil = Math.max(S.blindUntil, S.d.ph[j].e); break; }
+    }
+    // むてき も こっち向きの途中では切れない
+    if (t1 < S.mutekiUntil && isDanger(k)) {
+      var mi = phaseIndex(S.d, t1);
+      for (var mj = mi; mj < S.d.ph.length; mj++) if (S.d.ph[mj].k === 'RETURN') { S.mutekiUntil = Math.max(S.mutekiUntil, S.d.ph[mj].e); break; }
+    }
+    // ミステリーボックスが 開いた
+    if (S.pendingMystery && t1 >= S.pendingMystery.at) {
+      var pm = S.pendingMystery; S.pendingMystery = null;
+      if (pm.result === 'muteki') S.mutekiUntil = t1 + CONFIG.MUTEKI_SEC;
+      else { S.gekidoUntil = t1 + rRange(S.rng, CONFIG.GEKIDO_SEC); setMood(S, 'gekido', 99, t1); }
+      ev.push({ type: 'mysteryResult', result: pm.result });
+    }
+    // チラ見(向こう向きの間に たまに 肩ごしに ちらっ。アウトには ならない)
+    if (S.peek && t1 >= S.peek.e) { if (S.peek.caught) ev.push({ type: 'peekEnd', caught: true }); S.peek = null; }
+    if (!S.nextPeekAt) S.nextPeekAt = t1 + rRange(S.rng, CONFIG.PEEK_EVERY);
+    if (!S.peek && t1 >= S.nextPeekAt && !(S.tutorial && S.peeks >= 1)) {
+      var pp2 = phaseAt(S.d, t1);
+      if (pp2 && pp2.k === 'SAFE' && pp2.e - t1 >= CONFIG.PEEK_SAFE_LEFT && !isBlind(S, t1)) {
+        S.peek = { s: t1, e: t1 + CONFIG.PEEK_DUR, caught: false }; S.peeks++;
+        S.nextPeekAt = t1 + rRange(S.rng, CONFIG.PEEK_EVERY);
+        ev.push({ type: 'peek' });
+      }
     }
     // パーフェクト: 自動でも 1秒に8段
     if (k === 'PERFECT') {
@@ -615,7 +666,7 @@
     if (b.t === 'kin') { S.counts.gold++; S.goldWin = true; }
     if (b.t === 'niji') {
       S.bst.rainbows++;
-      var it = (S.firstPlay && S.bst.rainbows === 2) ? 'perfect' : S.bst.rainbows === 1 ? 'mekakushi' : wpick(S.rng, ITEM_POOL);
+      var it = (S.firstPlay && S.bst.rainbows === 2) ? 'mystery' : S.bst.rainbows === 1 ? 'mekakushi' : wpick(S.rng, ITEM_POOL);
       if (S.tutorial) it = 'mekakushi';
       addItem(S, it, ev);
     }
@@ -638,7 +689,9 @@
     if (t - S.lastHitAt < CONFIG.HIT_MIN_GAP) return ev;
     S.lastHitAt = t;
     var ph = phaseAt(S.d, t), k = ph ? ph.k : 'SAFE';
-    if (isWatching(S.d, t, S.blindUntil)) {
+    if (isWatching(S.d, t, S.blindUntil) && t < S.mutekiUntil) {   // むてき: 見られても「ずるい!」で おしまい
+      if (S.mutekiSavedPh !== ph) { S.mutekiSavedPh = ph; ev.push({ type: 'mutekiSave' }); }
+    } else if (isWatching(S.d, t, S.blindUntil)) {
       if (S.tutorial && S.tutForgive > 0) {
         S.tutForgive--; cutWatch(S, t, 0); ev.push({ type: 'forgive', left: S.tutForgive }); return ev;
       }
@@ -651,12 +704,15 @@
       ev.push({ type: 'out' });
       return ev;
     }
-    if (k === 'PERFECT') { var pe = []; for (var q = 0; q < CONFIG.PERFECT_TAP_DROPS; q++) pe = pe.concat(dropBlock(S, t, { perfect: true })); return pe; }
+    if (S.peek && !S.peek.caught && t >= S.peek.s && t < S.peek.e) {   // チラ見中に 叩いた:「ん?」→ 次の振り向きが少し早く
+      S.peek.caught = true; compressSafe(S, t, CONFIG.PEEK_SPEEDUP); ev.push({ type: 'peekCaught' });
+    }
+    if (k === 'PERFECT') { var pe = ev; for (var q = 0; q < CONFIG.PERFECT_TAP_DROPS; q++) pe = pe.concat(dropBlock(S, t, { perfect: true })); return pe; }
     if (t < S.blockReadyAt) { ev.push({ type: 'tooFast' }); return ev; }
     var b = S.tower[0], power = 1;
     if (S.malletHits > 0) { power = 3; S.malletHits--; }
     var res = hitBlock(b, t, power, { ring: ringWindow(S) });
-    if (res === 'drop') return dropBlock(S, t, { squeeze: k === 'WARN' && !isBlind(S, t) });
+    if (res === 'drop') return ev.concat(dropBlock(S, t, { squeeze: k === 'WARN' && !isBlind(S, t) }));   // チラ見の「ん?」も いっしょに返す
     if (res === 'miss') { S.combo = 0; ev.push({ type: 'miss', block: b }); return ev; }
     ev.push({ type: 'damage', block: b, power: power });
     return ev;
@@ -664,7 +720,7 @@
 
   // ------------------------------------------------------------------ ちょっかい・アイテム
   var CHOTTO_PHASES = { SAFE: 1, PAUSE: 1, FEINT: 1, WARN: 1 };
-  var HENGAO_P = { okori: 0.25, bikkuri: 0.30, ijiwaru: 0.35 };   // 変顔が効く確率(ほかの気分は HAGAO_SUCCESS)
+  var HENGAO_P = { gekido: 0.15, okori: 0.25, bikkuri: 0.30, ijiwaru: 0.35 };   // 変顔が効く確率(ほかの気分は HAGAO_SUCCESS)
   function canUseChotto(S, name, t) {
     if (S.out) return false;
     var k = kindAt(S.d, t);
@@ -738,7 +794,7 @@
     if (!canUseItem(S, slot, t)) return null;
     var it = S.slots[slot], ev = [{ type: 'useItem', item: it }], mood = S.d.mood;
     S.slots[slot] = null;
-    var bad = mood === 'okori' || mood === 'nakisou' || mood === 'ijiwaru';
+    var bad = mood === 'okori' || mood === 'nakisou' || mood === 'ijiwaru' || mood === 'gekido';
     switch (it) {
       case 'mekakushi': S.blindUntil = t + CONFIG.BLINDFOLD_SEC; break;
       case 'ocha':
@@ -748,13 +804,20 @@
         break;
       case 'odateru': setMood(S, mood === 'nakisou' ? 'gokigen' : 'tere', 3, t); break;
       case 'komoriuta':
-        if (mood === 'okori') { ev.push({ type: 'noSleep' }); break; }
+        if (mood === 'okori' || mood === 'gekido') { ev.push({ type: 'noSleep' }); break; }
         setMood(S, 'nemui', 3, t);
         insertPause(S, t, CONFIG.LULLABY_SEC, 'FROZEN', 'ねないよ… ねないって ば… ふぁ〜あ');
         break;
       case 'kizuchi': S.malletHits = CONFIG.GOLD_MALLET_HITS; break;
       case 'bai': S.doubleUntil = t + CONFIG.DOUBLE_SCORE_SEC; break;
         case 'tokei': insertPause(S, t, CONFIG.TIMESTOP_SEC, 'STOP', null); break;   // 予兆の途中なら insertPause が残りを TELL_MIN 以上にする
+      case 'mystery':   // ガタガタ…パカッ(1秒)。むてき か げきおこ か は 開けるまで ないしょ
+        S.counts.mystery = (S.counts.mystery || 0) + 1;
+        var res = S.rng() < CONFIG.MYSTERY_MUTEKI_P ? 'muteki' : 'gekido';
+        insertPause(S, t, CONFIG.MYSTERY_REVEAL, 'FROZEN', 'なになに…?');
+        S.pendingMystery = { at: t + CONFIG.MYSTERY_REVEAL, result: res };
+        ev.push({ type: 'mysteryOpen' });
+        break;
       case 'perfect':
         S.counts.perfects++;
         S.perfCount = 0; S.perfPts = 0;
