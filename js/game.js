@@ -757,7 +757,7 @@
     ctx.restore();
   }
   function drawStatus(S) {
-    var y = 340, items = [];
+    var y = 364, items = [];
     if (D.isBlind(S, S.t)) items.push(['目かくし', S.blindUntil > S.t + 99 ? '' : Math.ceil(S.blindUntil - S.t) + '', '#6a7ff0']);
     if (S.doubleUntil > S.t) items.push(['2倍', Math.ceil(S.doubleUntil - S.t) + '', '#d88a10']);
     if (S.malletHits > 0) items.push(['金づち', S.malletHits + '', '#c89010']);
