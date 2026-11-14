@@ -52,7 +52,8 @@
     GIRIGIRI_SEC: 0.15, GIRIGIRI_BONUS: 50,                                     // ギリギリセーフ
     KIN_EVERY: 50, KIN_CYCLES: 3,                                               // 金だるま
     BOUSAN_P: 0.08, SAISEN_WISH: 5, RENDA_TITLE: 15, IPPO_DROPS: 3,
-    REACT_PRE: 0.3, REACT_GRACE: 0.25, REACT_WATCH: 1.2, REACT_DEMO_PRE: 1.0, TSUNTSUN_JOY_P: 0.15, FACE_COMMON_P: 0.10, FACE_RARE_P: 0.025,
+    REACT_PRE: 0.40, REACT_GRACE: 0.25,   // 「!?」+ 猶予 = 0.65 秒(フェアさの基準 0.63 秒より長く)
+    REACT_WATCH: 1.2, REACT_DEMO_PRE: 1.0, TSUNTSUN_JOY_P: 0.15, FACE_COMMON_P: 0.10, FACE_RARE_P: 0.025,
     MYSTERY_REVEAL: 1.0, MUTEKI_SEC: 5, GEKIDO_SEC: [8, 10], MYSTERY_MUTEKI_P: 0.5,
     PERFECT_SEC: 5, PERFECT_DROP_RATE: 3.5, PERFECT_TAP_DROPS: 2, HENGAO_COOLDOWN: 12, TICKLE_MOOD_CYCLES: 1, TIMESTOP_SEC: 3, DOUBLE_SCORE_SEC: 10, GOLD_MALLET_HITS: 6,
     // 演出
@@ -72,7 +73,7 @@
     nemui:   { name: 'ねむい',   art: 'sleepy',    color: '#8fb8ff', letter: [0.50, 0.75], jitter: 0.15, pauseP: 0.40, pause: [0.8, 1.6], restartP: 0,    tell: [1.20, 1.50], feintP: 0,    doubleP: 0,    facing: [0.8, 1.2], cycles: [3, 3], mult: 1.0, say: 'zzz…' },
     nakisou: { name: 'なきそう', art: 'sad',       color: '#7fd6e8', letter: [0.25, 0.60], jitter: null, pauseP: 0.20, pause: [0.5, 1.0], restartP: 0.30, tell: [0.80, 1.00], feintP: 0,    doubleP: 0,    facing: [2.0, 3.0], cycles: [3, 3], mult: 1.2, say: 'ぐすっ' },
     tere:    { name: 'てれ',     art: 'shy',       color: '#ff8fb0', letter: [0.32, 0.46], jitter: 0.15, pauseP: 0.25, pause: [0.4, 0.8], restartP: 0,    tell: [0.90, 1.10], feintP: 0,    doubleP: 0,    facing: [0.4, 0.7], cycles: [3, 3], mult: 1.0, say: 'えへへ' },
-    gekido:  { name: 'げきおこ', art: 'angry',   color: '#ff1a1a', letter: [0.08, 0.26], jitter: null, pauseP: 0.10, pause: [0.2, 0.5], restartP: 0,    tell: [0.60, 0.66], feintP: 0.30, doubleP: 0.25, facing: [1.4, 2.2], cycles: [99, 99], mult: 3.0, say: 'ぐぬぬ…' },
+    gekido:  { name: 'げきおこ', art: 'furious',   color: '#ff1a1a', letter: [0.08, 0.26], jitter: null, pauseP: 0.10, pause: [0.2, 0.5], restartP: 0,    tell: [0.60, 0.66], feintP: 0.30, doubleP: 0.25, facing: [1.4, 2.2], cycles: [99, 99], mult: 3.0, say: 'ぐぬぬ…' },
     kin:     { name: '金だるま', art: 'normal',    color: '#ffd84a', letter: [0.26, 0.40], jitter: 0.15, pauseP: 0,    pause: [0, 0],     restartP: 0,    tell: [0.85, 1.00], feintP: 0,    doubleP: 0,    facing: [2.0, 2.0], cycles: [3, 3], mult: 3.0, say: 'まじめに いくよ' },
     bikkuri: { name: 'びっくり', art: 'surprised', color: '#ffe066', letter: [0, 0],       jitter: null, pauseP: 0,    pause: [0, 0],     restartP: 0,    tell: [0.60, 0.60], feintP: 0,    doubleP: 0,    facing: [1.2, 1.8], cycles: [1, 1], mult: 1.0, say: '!?' }
   };
@@ -364,7 +365,7 @@
     if (d.started) { d.left--; d.wakeUp = false; if (d.left <= 0) changeMoodNatural(S); }
     d.started = true;
     if (S.kinPending && d.mood !== 'gekido' && d.mood !== 'kin' && !S.tutorial) {   // 金だるま: 来る前に 知らせてから 3回
-      S.kinPending = false; setMoodRaw(d, 'kin', CONFIG.KIN_CYCLES); S.kinArrive = true;
+      S.kinPending = false; setMoodRaw(d, 'kin', CONFIG.KIN_CYCLES + 1); S.kinArrive = true; S.kinWatches = 0;
     }
     addCycle(S, t0, 0);
   }
@@ -460,10 +461,15 @@
     }
   }
   // 反応の顔の一覧(game.js が DARUMA_ART.FACES か 仮の一覧を入れる)
-  var FACE_LIST = [];
+  var FACE_LIST = [], JOY_IDS = ['motto', 'tehepero', 'manzara'];
   function setFaces(list) { FACE_LIST = list || []; }
   function pickFace(S, group) {
     if (!FACE_LIST.length) return null;
+    if (group === 'joy') {   // つんつんで よろこぶ顔(もっとやって・てへぺろ・まんざらでも)
+      var jl = FACE_LIST.filter(function (f) { return JOY_IDS.indexOf(f.id) >= 0; });
+      if (jl.length) return jl[Math.floor(S.rng() * jl.length)].id;
+      group = 'kusuguru';
+    }
     var r = S.rng(), g = group;
     if (r < CONFIG.FACE_RARE_P) g = 'rare'; else if (r < CONFIG.FACE_RARE_P + CONFIG.FACE_COMMON_P) g = 'common';
     var c = FACE_LIST.filter(function (f) { return f.group === g; });
@@ -632,6 +638,8 @@
         S.counts.girigiri = (S.counts.girigiri || 0) + 1; S.score += CONFIG.GIRIGIRI_BONUS; ev.push({ type: 'girigiri' });   // 見せ方と おまけ点だけ(ルールは かえない)
       }
       if (e.k === 'KOROBI') ev.push({ type: 'korobi' });
+      // 金だるまは こっち向き 3回で 帰る(ちょっかいで 1回が 作り直されても のびないように)
+      if (e.k === 'WATCH' && !e.ph.react && S.d.mood === 'kin') { S.kinWatches = (S.kinWatches || 0) + 1; if (S.kinWatches >= CONFIG.KIN_CYCLES) S.d.left = 1; }
       if (e.k === 'FROZEN' && e.ph.getup) ev.push({ type: 'getup' });
       if (S.kinArrive) { S.kinArrive = false; ev.push({ type: 'kinArrive' }); }
       if (S.kinLeave) { S.kinLeave = false; ev.push({ type: 'kinLeave' }); }
@@ -830,7 +838,7 @@
       if (joy) setMoodRaw(S.d, 'gokigen', 1);
       else if (mood === 'okori' || mood === 'gekido') setMoodRaw(S.d, 'nakisou', 3);
       else setMoodRaw(S.d, 'okori', 4);
-      ev.push(reactTurn(S, t, pickFace(S, joy ? 'kusuguru' : 'tsuntsun'), joy ? 'joy' : 'tsuntsun'));
+      ev.push(reactTurn(S, t, pickFace(S, joy ? 'joy' : 'tsuntsun'), joy ? 'joy' : 'tsuntsun'));
       ev.push({ type: 'tease', cry: !joy && (mood === 'okori' || mood === 'gekido'), joy: joy });
     } else if (name === 'hengao') {
       // にらめっこ: こっち向きを縮めるだけ(気分は変えない)。使ったら待ち時間。同じ手を続けると あきる

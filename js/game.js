@@ -152,7 +152,7 @@
     refreshRecords();
     G.mode = 'title'; G.paused = false; hideAll(); show('title', true);
     var rk = D.rankOf(G.rec.stats.totalDan || 0);
-    $('tBest').textContent = (G.rec.best ? 'ベスト ' + fmt(G.rec.best) + '点 / ' : '') + '段位 ' + rk.name + (rk.next ? '(' + rk.next + 'まで あと' + rk.toNext + '段)' : '');
+    $('tBest').textContent = (G.rec.best ? 'ベスト ' + fmt(G.rec.best) + '点 / 最高 ' + G.rec.bestDan + '段\n' : '') + '段位 ' + rk.name + (rk.next ? '(' + rk.next + 'まで あと' + rk.toNext + '段)' : '');
     if (false) $('tBest').textContent = G.rec.best ? 'ベスト ' + fmt(G.rec.best) + ' 点 / 最高 ' + G.rec.bestDan + ' 段' : 'はじめての挑戦!';
     $('tDaily').textContent = CHALLENGE ? 'ともだちから 挑戦状!\n' + CHALLENGE + '段を こえろ!' : '今日のだるまさん\n' + G.daily.line;
     AUDIO.bgm('title');
@@ -419,8 +419,9 @@
     setTimeout(function () { ['btnAgain', 'btnShare', 'btnToTitle'].forEach(function (id) { $(id).disabled = false; }); }, 800);   // 連打の指で うっかり押さないように
     var tl = got.map(function (id) { for (var i = 0; i < D.TITLES.length; i++) if (D.TITLES[i].id === id) return D.TITLES[i]; }).filter(Boolean);
     var showT = news.length ? tl.filter(function (x) { return news.indexOf(x.id) >= 0; }) : tl.slice(-1);
-    var rankLine = rankAfter.idx > rankBefore.idx ? '祝・' + rankAfter.name + '!(段位アップ)' : '段位 ' + rankAfter.name + (rankAfter.next ? '(あと' + rankAfter.toNext + '段で ' + rankAfter.next + ')' : '');
-    $('rTitle').textContent = news.length ? '称号: ' + showT.map(function (x) { return x.name; }).join('・') + '(NEW) / ' + rankLine : rankLine;
+    var up = rankAfter.idx > rankBefore.idx;
+    var rankLine = up ? '祝・' + rankAfter.name + '!' : '段位 ' + rankAfter.name + (rankAfter.next ? '(あと' + rankAfter.toNext + '段で ' + rankAfter.next + ')' : '');
+    $('rTitle').textContent = news.length ? '称号 ' + showT.map(function (x) { return x.name; }).join('・') + '(NEW)' + (up ? ' / ' + rankLine : '') : rankLine;
     if (false) $('rTitle').textContent = news.length ? '称号: ' + showT.map(function (x) { return x.name; }).join('・') + ' (NEW)' : (nextT ? 'つぎの称号: ' + nextT.name + '(' + nextT.how + ')' : '称号を ぜんぶ とったよ!');
     $('rNext').textContent = '';
     $('rFaces').textContent = '見たかお ' + countSeen() + ' / ' + faceList().length + (newFaces.length ? '   NEW ' + newFaces.length : '');
@@ -707,11 +708,11 @@
     var hopts = { turn: opt.turn != null ? opt.turn : pose.turn, mood: opt.mood || pose.mood, t: G.at, shake: pose.shake, dir: peeking ? -1 : 1 };
     // ほんとうに ころんだ: 足もとを 中心に 横へ ころん → よいしょ と起き上がる
     var fall = 0, kph = D.phaseAt(S.d, t);
-    if (kph && kph.k === 'KOROBI') fall = 1.45 * Math.min(1, (t - kph.s) / 0.25) + Math.sin(G.at * 9) * 0.04;
-    else if (kph && kph.getup) { var gq = (t - kph.s) / (kph.e - kph.s); fall = 1.45 * (1 - gq) - Math.sin(gq * Math.PI) * 0.15; }
+    if (kph && kph.k === 'KOROBI') fall = 1.15 * Math.min(1, (t - kph.s) / 0.25) + Math.sin(G.at * 9) * 0.04;
+    else if (kph && kph.getup) { var gq = (t - kph.s) / (kph.e - kph.s); fall = 1.15 * (1 - gq) - Math.sin(gq * Math.PI) * 0.15; }
     var hop = G.hop && G.at - G.hop < 0.3 ? -Math.sin((G.at - G.hop) / 0.3 * Math.PI) * 14 : 0;
     ctx.save();
-    if (fall) { var px = HEAD.x, py = hy + size * headBottom(); ctx.translate(px + size * 0.4, py); ctx.rotate(fall); ctx.translate(-px - size * 0.4, -py); hopts.turn = 0; }
+    if (fall) { var px = HEAD.x, py = hy + size * headBottom(); ctx.translate(px + size * 0.3, py); ctx.rotate(fall); ctx.translate(-px - size * 0.3, -py); hopts.turn = 0; }
     if (hop) ctx.translate(0, hop);
     if (pose.face && !opt.mood) drawFaceById(ctx, HEAD.x, hy, size, pose.face, { turn: hopts.turn, t: G.at, dir: 1 });
     else if (S.d.mood === 'kin' && !pose.blind) drawGoldHead(HEAD.x, hy, size, hopts);
@@ -758,13 +759,13 @@
       drawBox(x + sh, y + 40, 110, 0);
       var step = Math.floor(Math.pow(a * 14, 0.8)) % 2;
       if (step === 0) text('むてき?', x, y - 70, 30, '#ffd84a', 'center', 900, '#1b1430', 6);
-      else safeDraw('drawHead', [ctx, x, y - 70, 90, { turn: 1, mood: 'angry', t: G.at, shadow: false }]);
+      else safeDraw('drawHead', [ctx, x, y - 70, 90, { turn: 1, mood: 'furious', t: G.at, shadow: false }]);
       text('なにが でるかな…', x, y + 120, 20, '#ffffff', 'center', 900, '#1b1430', 5);
     } else {        // パカッ
       var sc = Math.min(1, end / 0.15);
       drawBox(x, y + 40, 110, 1);
       if (M.result === 'muteki') { text('むてき!', x, y - 60, 48 * (0.6 + 0.4 * sc), '#ffd84a', 'center', 900, '#1b1430', 8); text('5びょう 見られても セーフ', x, y + 120, 18, '#ffffff', 'center', 900, '#1b1430', 5); }
-      else { safeDraw('drawHead', [ctx, x, y - 66, 110 * (0.6 + 0.4 * sc), { turn: 1, mood: 'angry', t: G.at, shadow: false }]); text('げきおこ!!', x, y + 112, 30, '#ff3030', 'center', 900, '#ffffff', 6); text('点数3倍・すぐ ふりむく', x, y + 146, 18, '#ffffff', 'center', 900, '#1b1430', 5); }
+      else { safeDraw('drawHead', [ctx, x, y - 66, 110 * (0.6 + 0.4 * sc), { turn: 1, mood: 'furious', t: G.at, shadow: false }]); text('げきおこ!!', x, y + 112, 30, '#ff3030', 'center', 900, '#ffffff', 6); text('点数3倍・すぐ ふりむく', x, y + 146, 18, '#ffffff', 'center', 900, '#1b1430', 5); }
     }
   }
   var goldCv = null;
@@ -1317,14 +1318,17 @@
     var seen = G.rec.stats.faceIds || [];
     for (var i = 0; i < L.length; i++) {
       var f = L[i], x = (i % GRID_COLS + 0.5) * GRID_CELL, y = (Math.floor(i / GRID_COLS) + 0.5) * GRID_CELL;
+      var dia = GRID_CELL / 1.25, A = window.DARUMA_ART, th = null;
       if (seen.indexOf(f.id) >= 0) {
         if (newSet && newSet[f.id]) { c.save(); c.fillStyle = 'rgba(255,224,102,0.35)'; c.beginPath(); c.arc(x, y, GRID_CELL * 0.48, 0, 6.283); c.fill(); c.restore(); }
-        drawFaceById(c, x, y + 1, GRID_CELL * 0.8, f.id, {});
+        try { if (realFaces() && A.faceThumb) th = A.faceThumb(f.id, dia, sc); } catch (e) { th = null; }
+        if (th) c.drawImage(th, x - dia * 0.75, y + 3 - dia * 0.78, dia * 1.5, dia * 1.5);   // 1回だけ描いて覚えた 小さな絵
+        else drawFaceById(c, x, y + 1, GRID_CELL * 0.8, f.id, {});
         if (newSet && newSet[f.id]) {
           c.save(); c.font = '900 10px ' + FONT; c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineWidth = 3; c.strokeStyle = '#1b1430'; c.strokeText('NEW', x, y - GRID_CELL * 0.38); c.fillStyle = '#ff5a5a'; c.fillText('NEW', x, y - GRID_CELL * 0.38);
           c.fillStyle = '#fff6a0'; c.beginPath(); var sx = x + GRID_CELL * 0.36, sy = y - GRID_CELL * 0.3; for (var k = 0; k < 8; k++) { var a = k * Math.PI / 4, rr2 = k % 2 ? 2 : 6; c.lineTo(sx + Math.cos(a) * rr2, sy + Math.sin(a) * rr2); } c.closePath(); c.fill(); c.restore();
         }
-      } else drawFaceLocked(c, x, y, GRID_CELL * 0.8, f.id);
+      } else drawFaceLocked(c, x, y + 3, dia, f.id);
     }
   }
   function gridTap(ev, cv2) {

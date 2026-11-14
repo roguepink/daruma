@@ -45,8 +45,8 @@
   #pSound, #btnQuit { min-width: 128px; }
   .card { background: rgba(255, 250, 236, .95); color: #1b1430; border: 4px solid #1b1430; border-radius: 20px; margin: 0 18px; padding: 14px 12px; }
   .shadowtext { text-shadow: 0 2px 0 #1b1430, 0 0 8px rgba(0,0,0,.6); font-weight: 800; }
-  #tDaily { word-break: keep-all; top: 500px; font-size: 16px; padding: 0 10px; line-height: 1.5; white-space: pre-line; }
-  #tBest { top: 562px; font-size: 18px; color: #ffe066; }
+  #tDaily { word-break: keep-all; top: 488px; font-size: 16px; padding: 0 10px; line-height: 1.5; white-space: pre-line; }
+  #tBest { top: 546px; font-size: 16px; color: #ffe066; white-space: pre-line; line-height: 1.45; }
   #hNum { top: 18px; font-size: 18px; }
   #sa { position: fixed; left: 0; top: 0; width: 0; height: 0; visibility: hidden; padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px) 0; }
   .ptable { display: grid; grid-template-columns: auto 1fr auto; gap: 3px 8px; align-items: center; text-align: left; font-size: 16px; font-weight: 800; color: #1b1430; }
@@ -96,9 +96,8 @@
     <div class="abs" style="top:46px"><h1><span class="l1">こっち見ないで!</span><span class="l2">だるま落とし</span></h1></div>
     <p id="tDaily" class="abs shadowtext"></p>
     <p id="tBest" class="abs shadowtext"></p>
-    <div class="abs" style="top:588px"><button id="btnPlay" class="big" type="button">あそぶ</button></div>
-    <div class="abs" style="top:682px;display:flex;justify-content:center;gap:14px"><button id="btnHow" class="sub" type="button">あそびかた</button><button id="btnZukan" class="sub" type="button">かお図鑑</button></div>
-    <div class="abs" style="top:734px"><button id="tSound" class="sub" type="button">音:オン</button></div>
+    <div class="abs" style="top:604px"><button id="btnPlay" class="big" type="button">あそぶ</button></div>
+    <div class="abs" style="top:704px;display:flex;justify-content:center;gap:10px"><button id="btnHow" class="sub" type="button" style="padding:8px 14px">あそびかた</button><button id="btnZukan" class="sub" type="button" style="padding:8px 14px">かお図鑑</button><button id="tSound" class="sub" type="button" style="padding:8px 14px">音:オン</button></div>
   </div>
   <div id="zukan" class="overlay hidden">
     <div class="abs" style="top:18px"><h1 style="font-size:32px">かお図鑑</h1></div>
