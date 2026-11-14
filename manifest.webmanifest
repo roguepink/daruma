@@ -1,7 +1,7 @@
 {
   "name": "こっち見ないで!だるま落とし",
   "short_name": "だるま落とし",
-  "description": "だるまさんが向こうを向いている間に、何段落とせるか!こっちを向いたら手を止めて。くすぐる・目かくし・ダジャレで だるまさんの気分をあやつる、スリル満点のだるま落とし。",
+  "description": "だるまさんが向こうを向いている間に、トン!トン!と段を落とす。赤い「ころんだ」が出たら手を止めて、見られたらおしまい。くすぐる・ダジャレ・目かくしで だるまさんの気分をあやつる、スリル満点のだるま落とし。",
   "lang": "ja",
   "start_url": "./",
   "scope": "./",
@@ -11,8 +11,24 @@
   "background_color": "#140c2a",
   "theme_color": "#140c2a",
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
-  ]
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": []
 }

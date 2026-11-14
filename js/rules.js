@@ -207,6 +207,7 @@
       var one = function () { return (m.jitter == null ? rRange(rng, m.letter) : base * rRange(rng, [1 - m.jitter, 1 + m.jitter])) * lmul; };
       var from = clamp(o.from || 0, 0, 6);
       var sp = push('SAFE', 0), i, k;
+      if (from > 0) sp.L.push({ at: t, i: from - 1, silent: true });   // 言い終わった字は そのまま
       // 言い直し「だ…だる…」(はじめから言うときだけ)
       if (from === 0 && rng() < m.restartP) {
         var n = rInt(rng, 2, 4);
@@ -430,9 +431,10 @@
     for (var i = 0; i < d.ph.length; i++) {
       var p = d.ph[i];
       if (p.e < t0 - 0.0001) continue;
-      if (p.s > t1) break;
-      if (p.s > t0 && p.s <= t1) ev.push({ type: 'phase', k: p.k, ph: p, prev: i > 0 ? d.ph[i - 1].k : null });
-      for (var j = 0; j < p.L.length; j++) { var l = p.L[j]; if (l.at > t0 && l.at <= t1) ev.push({ type: 'letter', i: l.i, silent: l.silent, ph: p }); }
+      if (p.s >= t1) break;
+      // [t0, t1) で数える(ちょうど今の時刻に入れた区間も、次の1コマで拾える)
+      if (p.s >= t0 && p.s < t1) ev.push({ type: 'phase', k: p.k, ph: p, prev: i > 0 ? d.ph[i - 1].k : null });
+      for (var j = 0; j < p.L.length; j++) { var l = p.L[j]; if (l.at >= t0 && l.at < t1) ev.push({ type: 'letter', i: l.i, silent: l.silent, ph: p }); }
     }
     // 古い区間を捨てる(5秒より前)
     while (d.ph.length > 2 && d.ph[0].e < t1 - 5) d.ph.shift();

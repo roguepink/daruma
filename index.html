@@ -8,6 +8,7 @@
 <meta name="description" content="だるまさんが向こうを向いている間に、何段落とせるか!こっちを向いたら手を止めて。くすぐる・目かくし・ダジャレで だるまさんの気分をあやつる、スリル満点のだるま落とし。">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="だるま落とし">
@@ -22,103 +23,89 @@
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #140c2a; color: #fff;
-    font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", "Noto Sans JP", system-ui, sans-serif; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #140c2a; color: #fff; overscroll-behavior: none;
+    font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", "Noto Sans JP", system-ui, sans-serif;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
   canvas { position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; }
-  .overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 16px; text-align: center; padding: env(safe-area-inset-top) 24px env(safe-area-inset-bottom); background: rgba(10, 6, 24, .72); }
+  /* 論理サイズ 390×780 の「舞台」。game.js が画面に合わせて拡大縮小する */
+  #stage { position: fixed; left: 0; top: 0; width: 390px; height: 780px; transform-origin: 0 0; pointer-events: none; }
+  .overlay { position: absolute; inset: 0; pointer-events: auto; text-align: center; }
   .overlay.hidden { display: none; }
-  h1 { margin: 0; font-size: clamp(28px, 8vw, 48px); font-weight: 900; line-height: 1.25; }
-  p { margin: 0; line-height: 1.7; }
-  button { font: inherit; font-weight: 800; font-size: 20px; padding: 14px 36px; border: 3px solid #1b1430; border-radius: 999px;
-    background: #ffe066; color: #1b1430; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
-  #hud { position: fixed; top: calc(env(safe-area-inset-top) + 10px); left: 0; right: 0; display: flex; justify-content: space-between;
-    padding: 0 16px; font-weight: 800; font-size: 18px; pointer-events: none; text-shadow: 0 2px 0 #1b1430; }
+  .abs { position: absolute; left: 0; right: 0; }
+  h1 { margin: 0; font-weight: 900; line-height: 1.15; text-shadow: 0 3px 0 #1b1430, 0 0 12px rgba(0,0,0,.5); }
+  h1 .l1 { display: block; font-size: 34px; color: #ffe066; letter-spacing: 1px; }
+  h1 .l2 { display: block; font-size: 52px; color: #fff; }
+  p { margin: 0; line-height: 1.6; }
+  button { font: inherit; font-weight: 900; font-size: 22px; padding: 12px 28px; border: 4px solid #1b1430; border-radius: 999px;
+    background: #ffe066; color: #1b1430; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+    box-shadow: 0 6px 0 #1b1430; }
+  button:active { transform: translateY(4px); box-shadow: 0 2px 0 #1b1430; }
+  button.big { width: 310px; height: 82px; font-size: 36px; background: #9be15d; }
+  button.sub { font-size: 18px; padding: 8px 20px; background: #fff6e0; box-shadow: 0 4px 0 #1b1430; }
+  .card { background: rgba(255, 250, 236, .95); color: #1b1430; border: 4px solid #1b1430; border-radius: 20px; margin: 0 18px; padding: 14px 12px; }
+  .shadowtext { text-shadow: 0 2px 0 #1b1430, 0 0 8px rgba(0,0,0,.6); font-weight: 800; }
+  #tDaily { top: 500px; font-size: 15px; padding: 0 10px; line-height: 1.5; white-space: pre-line; }
+  #tBest { top: 562px; font-size: 18px; color: #ffe066; }
+  #hNum { top: 18px; font-size: 18px; }
+  #hText1 { font-size: 22px; font-weight: 800; }
+  #hText2 { font-size: 40px; font-weight: 900; color: #e02020; line-height: 1.3; }
+  #hText3 { font-size: 16px; margin-top: 6px; }
+  #pauseCard { top: 230px; padding: 26px 12px; }
+  #pauseCard h2 { margin: 0 0 18px; font-size: 32px; }
+  #pauseCard button { display: block; margin: 14px auto 0; }
+  #rLine { top: 178px; font-size: 16px; padding: 0 14px; line-height: 1.45; }
+  #rDanBox { top: 236px; font-size: 26px; font-weight: 900; }
+  #rDan { font-size: 76px; color: #ffe066; line-height: 1; }
+  #rScore { top: 326px; font-size: 32px; font-weight: 900; }
+  #rBest { top: 370px; font-size: 18px; }
+  #rBest.best { color: #ffe066; font-size: 24px; font-weight: 900; }
+  #rStats { top: 408px; font-size: 15px; }
+  #rTitle { top: 440px; font-size: 18px; color: #ffd0f0; padding: 0 12px; }
+  #rFaces { top: 518px; font-size: 16px; }
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
-<div id="hud"><span id="score">0</span><span id="best"></span></div>
-<div id="title" class="overlay">
-  <h1>こっち見ないで!だるま落とし</h1>
-  <p>だるまさんが向こうを向いている間に、何段落とせるか!こっちを向いたら手を止めて。くすぐる・目かくし・ダジャレで だるまさんの気分をあやつる、スリル満点のだるま落とし。</p>
-  <button id="btnPlay" type="button">あそぶ</button>
+<div id="stage">
+  <div id="title" class="overlay hidden">
+    <div class="abs" style="top:46px"><h1><span class="l1">こっち見ないで!</span><span class="l2">だるま落とし</span></h1></div>
+    <p id="tDaily" class="abs shadowtext"></p>
+    <p id="tBest" class="abs shadowtext"></p>
+    <div class="abs" style="top:600px"><button id="btnPlay" class="big" type="button">あそぶ</button></div>
+    <div class="abs" style="top:712px"><button id="btnHow" class="sub" type="button">あそびかた</button> <button id="tSound" class="sub" type="button">音:オン</button></div>
+  </div>
+  <div id="howto" class="overlay hidden">
+    <p id="hNum" class="abs shadowtext"></p>
+    <div class="abs card" style="top:432px"><p id="hText1"></p><p id="hText2"></p><p id="hText3"></p></div>
+    <div class="abs" style="top:648px"><button id="btnNext" class="big" type="button">つぎへ</button></div>
+    <div class="abs" style="top:740px"><button id="btnSkip" class="sub" type="button">とばす</button></div>
+  </div>
+  <div id="pause" class="overlay hidden" style="background:rgba(10,6,24,.6)">
+    <div id="pauseCard" class="abs card">
+      <h2>ひとやすみ</h2>
+      <button id="btnResume" class="big" type="button">つづける</button>
+      <button id="pSound" class="sub" type="button">音:オン</button>
+      <button id="btnQuit" class="sub" type="button">タイトルへ</button>
+    </div>
+  </div>
+  <div id="result" class="overlay hidden">
+    <p id="rLine" class="abs shadowtext"></p>
+    <div id="rDanBox" class="abs shadowtext"><span id="rDan">0</span> 段 おとした</div>
+    <p id="rScore" class="abs shadowtext"></p>
+    <p id="rBest" class="abs shadowtext"></p>
+    <p id="rStats" class="abs shadowtext"></p>
+    <p id="rTitle" class="abs shadowtext"></p>
+    <p id="rFaces" class="abs shadowtext"></p>
+    <div class="abs" style="top:612px"><button id="btnAgain" class="big" type="button">もういっかい</button></div>
+    <div class="abs" style="top:718px"><button id="btnToTitle" class="sub" type="button">タイトルへ</button></div>
+  </div>
 </div>
-<div id="over" class="overlay hidden">
-  <h1 id="overText">おしまい</h1>
-  <p id="overScore"></p>
-  <button id="btnAgain" type="button">もういっかい</button>
-</div>
+<script src="js/audio.js"></script>
+<script src="js/daruma-art.js"></script>
+<script src="js/rules.js"></script>
+<script src="js/game.js"></script>
 <script>
 'use strict';
-/* ★ これは「ひな型」。ゲームの中身(update / draw / 入力)を ここに作りこむ。
-   守ること: 論理サイズを固定して拡縮・タップ操作・最初のタップで開始・ポーズ(blur)・ハイスコア(localStorage)・壊れても固まらない */
-var CONFIG = { W: 360, H: 640, DT: 1 / 60, BEST_KEY: 'daruma-best' };
-var cv = document.getElementById('game'), ctx = cv.getContext('2d');
-var G = { state: 'title', score: 0, best: 0, t: 0, px: CONFIG.W / 2, paused: false };
-try { G.best = +localStorage.getItem(CONFIG.BEST_KEY) || 0; } catch (e) {}
-document.getElementById('best').textContent = G.best ? 'ベスト ' + G.best : '';
-
-function resize() {
-  var dpr = Math.min(window.devicePixelRatio || 1, 3);
-  cv.width = Math.round(innerWidth * dpr); cv.height = Math.round(innerHeight * dpr);
-  var s = Math.min(cv.width / CONFIG.W, cv.height / CONFIG.H);
-  ctx.setTransform(s, 0, 0, s, (cv.width - CONFIG.W * s) / 2, (cv.height - CONFIG.H * s) / 2);
-}
-addEventListener('resize', resize); resize();
-
-function toLogical(ev) {
-  var r = cv.getBoundingClientRect(), s = Math.min(r.width / CONFIG.W, r.height / CONFIG.H);
-  return { x: (ev.clientX - r.left - (r.width - CONFIG.W * s) / 2) / s, y: (ev.clientY - r.top - (r.height - CONFIG.H * s) / 2) / s };
-}
-cv.addEventListener('pointerdown', function (ev) { if (G.state === 'play') G.px = toLogical(ev).x; });
-cv.addEventListener('pointermove', function (ev) { if (G.state === 'play' && ev.buttons) G.px = toLogical(ev).x; });
-addEventListener('keydown', function (ev) { if (ev.key === 'ArrowLeft') G.px -= 20; if (ev.key === 'ArrowRight') G.px += 20; });
-
-function start(ev) {
-  G.state = 'play'; G.score = 0; G.t = 0; G.px = CONFIG.W / 2;
-  document.getElementById('title').classList.add('hidden'); document.getElementById('over').classList.add('hidden');
-  // iPhone / Android で最初のタップのあとに全画面にする(失敗してもそのまま遊べる)。#play の自動開始では やらない
-  if (ev && ev.isTrusted) try {
-    var el = document.documentElement, fs = el.requestFullscreen || el.webkitRequestFullscreen;
-    var pr = fs && fs.call(el);
-    if (pr && pr.catch) pr.catch(function () {});   // 断られても(自動確認のときなど)エラーにしない
-  } catch (e) {}
-}
-function finish() {
-  G.state = 'over';
-  if (G.score > G.best) { G.best = G.score; try { localStorage.setItem(CONFIG.BEST_KEY, String(G.best)); } catch (e) {} }
-  document.getElementById('overScore').textContent = 'スコア ' + G.score + (G.best ? ' / ベスト ' + G.best : '');
-  document.getElementById('over').classList.remove('hidden');
-}
-document.getElementById('btnPlay').addEventListener('click', start);
-document.getElementById('btnAgain').addEventListener('click', start);
-document.addEventListener('visibilitychange', function () { if (document.hidden) G.paused = true; else G.paused = false; });
-
-function update(dt) {
-  G.t += dt; G.score = Math.floor(G.t * 10);
-  G.px = Math.max(20, Math.min(CONFIG.W - 20, G.px));
-  if (G.t > 15) finish();                       // ← ひな型: 15秒で おしまい。ここに ゲームの勝ち負けを書く
-  document.getElementById('score').textContent = G.score;
-}
-function draw() {
-  ctx.fillStyle = '#140c2a'; ctx.fillRect(-1000, -1000, 3000, 3000);
-  ctx.fillStyle = '#ffe066'; ctx.beginPath(); ctx.arc(G.px, CONFIG.H - 120, 20, 0, 6.283); ctx.fill();   // ← ひな型の 丸
-}
-
-var last = 0, acc = 0;
-function loop(now) {
-  requestAnimationFrame(loop);
-  try {
-    var dt = Math.min((now - last) / 1000, 0.05); last = now;
-    if (G.state === 'play' && !G.paused) { acc += dt; while (acc >= CONFIG.DT) { update(CONFIG.DT); acc -= CONFIG.DT; } }
-    draw();
-  } catch (e) { console.error(e); }             // 1回の失敗で 全体が止まらないように
-}
-requestAnimationFrame(function (t) { last = t; loop(t); });
-// 確認用: アドレスのうしろに #play をつけると、タイトルを飛ばして すぐ始まる(スクショ・自動確認で使う)
-if (location.hash === '#play') start();
-
 // LINE の中で開いたときだけ、1回だけ案内する(LINE の中は画面が小さく、ホーム画面にも入れられない)
 (function () {
   var seenKey = 'daruma-line-tip', seen = false;
@@ -141,8 +128,8 @@ if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
 </script>
 <script>
   // はじめの画面(Google Play 風: インストール / このまま遊ぶ)。install.js が出す。ホーム画面から開いたときは出ない
-  window.INSTALL_GATE = { id: 'daruma', name: 'こっち見ないで!だるま落とし', icon: 'icon-192.png', tagline: '', desc: 'だるまさんが向こうを向いている間に、何段落とせるか!こっちを向いたら手を止めて。くすぐる・目かくし・ダジャレで だるまさんの気分をあやつる、スリル満点のだるま落とし。',
-    points: [], shots: [], badges: ['無料', '広告なし', '登録なし'] };
+  window.INSTALL_GATE = { id: 'daruma', name: 'こっち見ないで!だるま落とし', icon: 'icon-192.png', tagline: 'だるまさんが ころんだ × だるま落とし', desc: 'だるまさんが向こうを向いている間に、何段落とせるか!こっちを向いたら手を止めて。くすぐる・目かくし・ダジャレで だるまさんの気分をあやつる、スリル満点のだるま落とし。',
+    points: ['だるまさんが むこうを向いている間に、トン!トン!と段を落とす', '赤い「ころんだ」が出たら手をとめて。見られたら おしまい', 'くすぐる・ダジャレ・目かくしで、だるまさんの きぶんを あやつろう'], shots: [], badges: ['無料', '広告なし', '登録なし'], shield: true };
 </script>
 <script src="install.js"></script>
 </body>

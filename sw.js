@@ -1,10 +1,10 @@
 'use strict';
 /* オフラインでも遊べるようにする(ホーム画面に入れたあと、電波がなくても起動する)。
-   ゲームは index.html 1枚で完結しているので、それと アイコン類だけを覚えておく。
+   ゲームは index.html と js/*.js で動くので、それと アイコン類を覚えておく。
    ゲームを直しただけなら VERSION は そのままでいい(開くたびに、まずネットで最新を取りにいくので)。
    FILES(覚えるファイル)を変えたときだけ VERSION を 1つ上げる(古い覚えを 一斉に捨てる)。 */
-const VERSION = 'daruma-v1';
-const FILES = ['./', 'index.html', 'install.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'maskable-512.png', 'apple-touch-icon.png'];
+const VERSION = 'daruma-v2';
+const FILES = ['./', 'index.html', 'install.js', 'manifest.webmanifest', 'js/audio.js', 'js/daruma-art.js', 'js/rules.js', 'js/game.js', 'icon-192.png', 'icon-512.png', 'maskable-512.png', 'apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));
