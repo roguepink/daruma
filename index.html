@@ -55,9 +55,9 @@
   .ptable .how { font-size: 16px; color: #4a3a5a; }
   #hCard.tall { top: 64px !important; }
   #hTable { margin-top: 6px; }
-  #rWin { top: 380px; font-size: 20px; color: #9be15d; font-weight: 900; }
+  #rWin { top: 242px; font-size: 17px; color: #9be15d; font-weight: 900; }
   #rNext { display: none; top: 470px; font-size: 16px; color: #ffe8a0; padding: 0 12px; }
-  #rToast { top: 650px; font-size: 16px; color: #9be15d; }
+  #rToast { top: 752px; font-size: 16px; color: #9be15d; }
   #result button.big[disabled], #result button.sub[disabled] { opacity: .35; }
   #pauseCard .ptable { margin: 4px 6px 4px; }
   #hText1 { font-size: 22px; font-weight: 800; }
@@ -67,15 +67,25 @@
   #pauseCard h2 { margin: 0 0 6px; font-size: 28px; }
   #pauseCard button { display: block; margin: 10px auto 0; }
   #pauseCard p.small { font-size: 16px; font-weight: 800; margin: 2px 0; }
-  #rLine { top: 166px; font-size: 17px; padding: 0 14px; line-height: 1.45; word-break: keep-all; overflow-wrap: anywhere; }
-  #rDanBox { top: 214px; font-size: 26px; font-weight: 900; }
-  #rDan { font-size: 76px; color: #ffe066; line-height: 1; }
-  #rScore { top: 300px; font-size: 32px; font-weight: 900; }
-  #rBest { top: 344px; font-size: 18px; }
-  #rBest.best { color: #ffe066; font-size: 24px; font-weight: 900; }
-  #rStats { top: 414px; font-size: 16px; }
-  #rTitle { top: 442px; font-size: 18px; color: #ffd0f0; padding: 0 12px; }
-  #rFaces { top: 494px; font-size: 16px; }
+  #rLine { top: 94px; font-size: 16px; padding: 0 14px; line-height: 1.45; word-break: keep-all; overflow-wrap: anywhere; }
+  #rDanBox { top: 120px; font-size: 22px; font-weight: 900; }
+  #rDan { font-size: 54px; color: #ffe066; line-height: 1; }
+  #rScore { top: 180px; font-size: 26px; font-weight: 900; }
+  #rBest { top: 214px; font-size: 17px; }
+  #rBest.best { color: #ffe066; font-size: 19px; font-weight: 900; }
+  #rStats { top: 266px; font-size: 16px; }
+  #rTitle { top: 290px; font-size: 16px; color: #ffd0f0; padding: 0 12px; }
+  #rFaces { top: 316px; font-size: 17px; font-weight: 900; }
+  .gridbox { position: absolute; left: 0; width: 390px; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; background: rgba(10,6,24,.45); border-top: 2px solid rgba(255,255,255,.25); border-bottom: 2px solid rgba(255,255,255,.25); touch-action: pan-y; }
+  .gridbox canvas, #fmCanvas { position: static; inset: auto; display: block; touch-action: pan-y; }
+  #fmCanvas { margin: 0 auto; }
+  #rGridBox { top: 344px; height: 254px; }
+  #zukan { background: rgba(10,6,24,.94); }
+  #zGridBox { top: 104px; height: 570px; }
+  #faceModal { background: rgba(10,6,24,.7); z-index: 5; }
+  #fmCard { top: 170px; padding: 16px 10px; }
+  #fmName { font-size: 28px; font-weight: 900; margin-top: 6px; }
+  #fmGroup { font-size: 16px; color: #5a4a6a; }
 </style>
 </head>
 <body>
@@ -86,8 +96,18 @@
     <div class="abs" style="top:46px"><h1><span class="l1">こっち見ないで!</span><span class="l2">だるま落とし</span></h1></div>
     <p id="tDaily" class="abs shadowtext"></p>
     <p id="tBest" class="abs shadowtext"></p>
-    <div class="abs" style="top:600px"><button id="btnPlay" class="big" type="button">あそぶ</button></div>
-    <div class="abs" style="top:712px"><button id="btnHow" class="sub" type="button">あそびかた</button> <button id="tSound" class="sub" type="button">音:オン</button></div>
+    <div class="abs" style="top:588px"><button id="btnPlay" class="big" type="button">あそぶ</button></div>
+    <div class="abs" style="top:682px;display:flex;justify-content:center;gap:14px"><button id="btnHow" class="sub" type="button">あそびかた</button><button id="btnZukan" class="sub" type="button">かお図鑑</button></div>
+    <div class="abs" style="top:734px"><button id="tSound" class="sub" type="button">音:オン</button></div>
+  </div>
+  <div id="zukan" class="overlay hidden">
+    <div class="abs" style="top:18px"><h1 style="font-size:32px">かお図鑑</h1></div>
+    <p id="zCount" class="abs shadowtext" style="top:66px;font-size:18px"></p>
+    <div id="zGridBox" class="gridbox"><canvas id="zGrid"></canvas></div>
+    <div class="abs" style="top:690px"><button id="btnZBack" class="big" type="button">もどる</button></div>
+  </div>
+  <div id="faceModal" class="overlay hidden">
+    <div id="fmCard" class="abs card"><canvas id="fmCanvas" width="400" height="400" style="width:180px;height:180px"></canvas><p id="fmName"></p><p id="fmGroup"></p><button id="btnFmClose" class="sub" type="button" style="margin-top:10px">とじる</button></div>
   </div>
   <div id="howto" class="overlay hidden">
     <p id="hNum" class="abs shadowtext"></p>
@@ -114,9 +134,10 @@
     <p id="rTitle" class="abs shadowtext"></p>
     <p id="rNext" class="abs shadowtext"></p>
     <p id="rFaces" class="abs shadowtext"></p>
-    <div class="abs" style="top:556px"><button id="btnAgain" class="big" type="button">もういっかい</button></div>
+    <div id="rGridBox" class="gridbox"><canvas id="rGrid"></canvas></div>
+    <div class="abs" style="top:606px"><button id="btnAgain" class="big" type="button">もういっかい</button></div>
     <p id="rToast" class="abs shadowtext"></p>
-    <div class="abs" style="top:682px;display:flex;justify-content:center;gap:16px"><button id="btnShare" class="sub" type="button">送る・シェア</button><button id="btnToTitle" class="sub" type="button">タイトルへ</button></div>
+    <div class="abs" style="top:700px;display:flex;justify-content:center;gap:16px"><button id="btnShare" class="sub" type="button">送る・シェア</button><button id="btnToTitle" class="sub" type="button">タイトルへ</button></div>
   </div>
 </div>
 <script src="js/audio.js"></script>

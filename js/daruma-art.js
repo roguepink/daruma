@@ -223,87 +223,224 @@
     return clamp(b, 0, 1);
   }
 
-  // 表情ごとの決まり
+  // ===============================================================
+  // 表情のしくみ: 「部品の組み合わせ(レシピ)」で顔を作る
+  // ===============================================================
+  // レシピ(recipe)のキー:
+  //   b / bR : 眉(BROWS の名前 / 'none' / [内u,内v,外u,外v,そり,太さ])。bR があれば見て右の眉だけ変える
+  //   e / eR : 目(EYES の名前 / ['名前', {上書き}] )。eR があれば見て右の目だけ変える
+  //   m      : 口(drawMouth の種類)      c : ほっぺの赤さ(0〜1.3。1より大きいと斜線)
+  //   puff   : ほっぺぷくー             tint : 顔の色(angry furious mean sad pale gloom green yellow soot pink gold stone gekiga grey)
+  //   body   : 体の色(red fire gold white blue stone soot pink rainbow)
+  //   fx     : まわりの動くもの(湯気・汗・音符…)の名前の配列。'text:ムッ' で文字も出せる
+  //   acc    : 小物(glasses sunglasses hachimaki bandage urna horns catEars afro towel flower)
+  //   anim   : 体の動き(tremble trembleBig bounce wobble jump roll squash shake twitch tiltL tiltBig bow …)
+  //   st     : 口ひげの上げ下げ(-で上)  wig : 口ひげがぴょこぴょこ   nose : 'red'(赤い大きな鼻)
+  //   yaw    : 前向きでも少し横を向く(ぷいっ)   bubble : 鼻ちょうちん   blind : 目かくし
   // brow: 眉(左の眉の 内はし iu,iv / 外はし ou,ov / そり arch / 太さ w)。右は左右反転。
-  // eye : type open/arcUp/arcDown/squeeze/spiral/blank/none, lid=上まぶた 0〜1, lidAng=つり具合(+で内側が下がる=怒り),
-  //       low=下まぶた, pr=黒目の大きさ, look=[x,y] 黒目の向き, size=目の大きさ, wet=うるうる
-  var MOOD_LABELS = {
-    normal: 'ふつう', happy: 'にこにこ', laugh: '大笑い', angry: 'おこり', furious: 'げきおこ', mean: 'いじわる', sleepy: 'ねむい',
-    sad: 'なきそう', shy: 'てれ', surprised: 'びっくり', blind: '目かくし', dizzy: 'めがまわる', smug: 'ドヤ',
-    suspicious: 'うたがい', oneeye: '片目(伝統)'
-  };
-  var MOODS = Object.keys(MOOD_LABELS);
-
+  // eye : type, lid=上まぶた 0〜1, lidAng=つり具合(+で内側が下がる=怒り), low=下まぶた, pr=黒目の大きさ,
+  //       look=[x,y] 黒目の向き, size=目の大きさ, wet=うるうる, sparkle=キラキラ, glow=光る, fire=炎, gek=劇画, stream=滝なみだ
   function B(iu, iv, ou, ov, arch, w) { return { iu: iu * 1.05, iv: iv - 0.02, ou: ou * 1.08, ov: ov - 0.02, arch: arch, w: (w || 0.11) * 1.12 }; }
   function E(o) {
     var e = { type: 'open', lid: 0, lidAng: 0, low: 0, pr: 0.56, look: [0, 0.12], size: 1, wet: false };
     for (var k in o) e[k] = o[k];
     return e;
   }
-  function moodSpec(mood, t) {
-    var S = { browL: B(0.07, -0.47, 0.43, -0.49, 0.07), browR: null, eyeL: E({}), eyeR: null,
-      mouth: 'smile', cheek: 0.45, tint: null, mustache: true };
-    switch (mood) {
-      case 'happy':
-        S.browL = B(0.07, -0.52, 0.43, -0.52, 0.1);
-        S.eyeL = E({ type: 'arcUp' }); S.mouth = 'open'; S.cheek = 0.7; break;
-      case 'laugh':
-        S.browL = B(0.07, -0.55, 0.43, -0.5, 0.12);
-        S.eyeL = E({ type: 'squeeze' }); S.mouth = 'big'; S.cheek = 0.85; break;
-      case 'angry':
-        S.browL = B(0.05, -0.34, 0.44, -0.55, -0.02, 0.15);
-        S.eyeL = E({ pr: 0.38, lid: 0.36, lidAng: 0.55, look: [0, 0.05] });
-        S.mouth = 'grit'; S.cheek = 0; S.tint = 'angry'; break;
-      case 'furious': // (作る係が足した)げきおこ: おこりより 目が細く つり上がり、顔がもっと赤い
-        S.browL = B(0.04, -0.30, 0.45, -0.60, -0.04, 0.18);
-        S.eyeL = E({ pr: 0.34, lid: 0.48, lidAng: 0.75, look: [0, 0.05] });
-        S.mouth = 'grit'; S.cheek = 0; S.tint = 'angry'; S.furious = true; break;
-      case 'mean':
-        S.browL = B(0.06, -0.38, 0.43, -0.47, 0.0, 0.13);     // 見て左の眉: 下げる
-        S.browR = B(0.07, -0.52, 0.42, -0.63, 0.13, 0.11);    // 見て右の眉: つり上げる
-        S.eyeL = E({ lid: 0.5, lidAng: 0.38, low: 0.2, pr: 0.5, look: [0.75, 0.1] });
-        S.eyeR = E({ lid: 0.42, lidAng: 0.3, low: 0.18, pr: 0.5, look: [0.75, 0.1] });
-        S.mouth = 'smirk'; S.cheek = 0.15; S.tint = 'mean'; break;
-      case 'sleepy':
-        S.browL = B(0.07, -0.46, 0.43, -0.41, 0.05, 0.1);
-        S.eyeL = E({ lid: 0.6 + 0.14 * Math.sin(t * 1.3), lidAng: -0.12, pr: 0.5, look: [0, 0.45] });
-        S.mouth = 'yawn'; S.cheek = 0.35; break;
-      case 'sad':
-        S.browL = B(0.06, -0.6, 0.42, -0.42, -0.05, 0.12);
-        S.eyeL = E({ pr: 0.64, look: [0, 0.2], wet: true });
-        S.mouth = 'sad'; S.cheek = 0.25; S.tint = 'sad'; break;
-      case 'shy':
-        S.browL = B(0.07, -0.52, 0.43, -0.45, 0.04, 0.1);
-        S.eyeL = E({ pr: 0.6, look: [-0.8, 0.55], wet: true });
-        S.mouth = 'wavy'; S.cheek = 1.2; break;
-      case 'surprised':
-        S.browL = B(0.07, -0.62, 0.43, -0.62, 0.12, 0.09);
-        S.eyeL = E({ size: 1.12, pr: 0.26, look: [0, 0] });
-        S.mouth = 'O'; S.cheek = 0.15; break;
-      case 'blind':
-        S.browL = B(0.07, -0.53, 0.43, -0.55, 0.09, 0.1);
-        S.eyeL = E({ type: 'none' }); S.mouth = 'open'; S.cheek = 0.55; break;
-      case 'dizzy':
-        S.browL = B(0.07, -0.53, 0.43, -0.44, -0.02, 0.1);
-        S.eyeL = E({ type: 'spiral' }); S.mouth = 'wavy'; S.cheek = 0.3; break;
-      case 'smug':
-        S.browL = B(0.07, -0.5, 0.43, -0.58, 0.1, 0.11);
-        S.eyeL = E({ lid: 0.5, lidAng: -0.3, low: 0.12, pr: 0.55, look: [0, 0.1] });
-        S.mouth = 'smug'; S.cheek = 0.5; break;
-      case 'suspicious':
-        S.browL = B(0.06, -0.41, 0.43, -0.43, 0.0, 0.12);
-        S.eyeL = E({ lid: 0.52, low: 0.24, pr: 0.55, look: [-0.85, 0] });
-        S.mouth = 'flat'; S.cheek = 0.15; break;
-      case 'oneeye':
-        S.eyeL = E({}); S.eyeR = E({ type: 'blank' }); break;
-    }
-    if (!S.browR) S.browR = S.browL;
-    if (!S.eyeR) S.eyeR = S.eyeL;
+  var BROWS = {
+    normal: [0.07, -0.47, 0.43, -0.49, 0.07], happy: [0.07, -0.52, 0.43, -0.52, 0.1], laugh: [0.07, -0.55, 0.43, -0.5, 0.12],
+    angry: [0.05, -0.34, 0.44, -0.55, -0.02, 0.15], angry2: [0.06, -0.4, 0.43, -0.52, 0, 0.12], furious: [0.04, -0.3, 0.45, -0.62, -0.05, 0.18],
+    low: [0.06, -0.38, 0.43, -0.47, 0, 0.13], up: [0.07, -0.52, 0.42, -0.63, 0.13, 0.11], relaxed: [0.07, -0.46, 0.43, -0.41, 0.05, 0.1],
+    sad: [0.06, -0.6, 0.42, -0.42, -0.05, 0.12], worried: [0.07, -0.56, 0.43, -0.46, 0, 0.11], high: [0.07, -0.62, 0.43, -0.62, 0.12, 0.09],
+    flat: [0.06, -0.41, 0.43, -0.43, 0, 0.12], smug: [0.07, -0.5, 0.43, -0.58, 0.1, 0.11], blind: [0.07, -0.53, 0.43, -0.55, 0.09, 0.1],
+    dizzy: [0.07, -0.53, 0.43, -0.44, -0.02, 0.1], thick: [0.06, -0.44, 0.44, -0.52, 0.06, 0.21], gekiga: [0.05, -0.36, 0.46, -0.5, -0.04, 0.2],
+    tiny: [0.16, -0.5, 0.34, -0.51, 0.03, 0.07]
+  };
+  var EYES = {
+    open: {}, big: { size: 1.15, pr: 0.6 }, tiny: { size: 1.12, pr: 0.26, look: [0, 0] },
+    happy: { type: 'arcUp' }, closed: { type: 'arcDown' }, squeeze: { type: 'squeeze' }, spiral: { type: 'spiral' },
+    white: { type: 'blank' }, none: { type: 'none' }, half: { lid: 0.5 },
+    sleepy: { lid: 0.6, lidAng: -0.12, pr: 0.5, look: [0, 0.45], sway: true },
+    angry: { pr: 0.38, lid: 0.36, lidAng: 0.55, look: [0, 0.05] }, furious: { glow: true, lid: 0.34, lidAng: 0.6 },
+    glare: { pr: 0.28, lid: 0.45, lidAng: 0.6, low: 0.18, look: [0.85, 0] },
+    wet: { pr: 0.64, look: [0, 0.2], wet: true }, shy: { pr: 0.6, look: [-0.8, 0.55], wet: true },
+    mean: { lid: 0.5, lidAng: 0.38, low: 0.2, pr: 0.5, look: [0.75, 0.1] }, meanR: { lid: 0.42, lidAng: 0.3, low: 0.18, pr: 0.5, look: [0.75, 0.1] },
+    smug: { lid: 0.5, lidAng: -0.3, low: 0.12, pr: 0.55, look: [0, 0.1] }, suspicious: { lid: 0.52, low: 0.24, pr: 0.55, look: [-0.85, 0] },
+    star: { type: 'star' }, heart: { type: 'heart' }, x: { type: 'x' }, line: { type: 'line' }, wave: { type: 'wave' },
+    sparkle: { pr: 0.7, wet: true, sparkle: true, look: [0, 0.05], size: 1.08 }, fire: { fire: true, lid: 0.22, lidAng: 0.45 },
+    gekiga: { gek: true, pr: 0.22, lid: 0.3, lidAng: 0.45, look: [0, 0] }, buddha: { lid: 0.64, lidAng: -0.15, pr: 0.55, look: [0, 0.7] },
+    cryHappy: { type: 'arcUp', stream: true }, cry: { type: 'arcDown', stream: true }, ink: { type: 'ink' }, dot: { type: 'dot' }
+  };
+  function browOf(x) {
+    if (x === 'none') return null;
+    if (x == null) x = 'normal';
+    if (typeof x === 'string') x = BROWS[x] || BROWS.normal;
+    if (Array.isArray(x)) return B.apply(null, x);
+    return x;
+  }
+  function eyeOf(x) {
+    var base = {}, over = null, k;
+    if (typeof x === 'string') base = EYES[x] || {};
+    else if (Array.isArray(x)) { base = EYES[x[0]] || {}; over = x[1]; }
+    else if (x) over = x;
+    var e = E(base);
+    if (over) for (k in over) e[k] = over[k];
+    return e;
+  }
+  function specOf(r) {
+    r = r || {};
+    var S = {
+      browL: browOf(r.b), browR: r.bR !== undefined ? browOf(r.bR) : undefined,
+      eyeL: eyeOf(r.e || 'open'), eyeR: r.eR ? eyeOf(r.eR) : null,
+      mouth: r.m || 'smile', cheek: r.c == null ? 0.45 : r.c, puff: !!r.puff, tint: r.tint || null, body: r.body || 'red',
+      fx: r.fx || [], acc: r.acc || [], anim: r.anim || null, st: r.st || 0, wig: !!r.wig, nose: r.nose || 'normal',
+      yaw: r.yaw || 0, bubble: !!r.bubble, blind: !!r.blind
+    };
+    if (S.browR === undefined) S.browR = S.browL;
+    if (!S.eyeR) S.eyeR = eyeOf(r.e || 'open');
     return S;
   }
+  function has(arr, name) { return arr.indexOf(name) >= 0; }
+
+  // ---- いまの14+1の気分(ゲームで使う名前) ----
+  var MOOD_LABELS = {
+    normal: 'ふつう', happy: 'にこにこ', laugh: '大笑い', angry: 'おこり', mean: 'いじわる', sleepy: 'ねむい',
+    sad: 'なきそう', shy: 'てれ', surprised: 'びっくり', blind: '目かくし', dizzy: 'めがまわる', smug: 'ドヤ',
+    suspicious: 'うたがい', oneeye: '片目(伝統)', furious: 'げきおこ'
+  };
+  var MOODS = Object.keys(MOOD_LABELS);
+  var MOOD_RECIPES = {
+    normal: {},
+    happy: { b: 'happy', e: 'happy', m: 'open', c: 0.7, fx: ['notes'], anim: 'sway', st: -0.025 },
+    laugh: { b: 'laugh', e: 'squeeze', m: 'big', c: 0.85, fx: ['notes', 'laughTears'], anim: 'bounce', st: -0.025, wig: true },
+    angry: { b: 'angry', e: 'angry', m: 'grit', c: 0, tint: 'angry', fx: ['steam', 'vein'], anim: 'tremble', st: -0.02 },
+    furious: { b: 'furious', e: 'furious', m: 'shout', c: 0, tint: 'furious', body: 'fire', fx: ['steamBig', 'veinMany'], anim: 'trembleBig', st: -0.04 },
+    mean: { b: 'low', bR: 'up', e: 'mean', eR: 'meanR', m: 'smirk', c: 0.15, tint: 'mean', fx: ['sweat'] },
+    sleepy: { b: 'relaxed', e: 'sleepy', m: 'yawn', c: 0.35, fx: ['zzz'], bubble: true, anim: 'doze' },
+    sad: { b: 'sad', e: 'wet', m: 'sad', c: 0.25, tint: 'sad', fx: ['tears'], anim: 'trembleSmall', st: 0.02 },
+    shy: { b: 'worried', e: 'shy', m: 'wavy', c: 1.2, fx: ['hearts', 'sweat'], anim: 'shy' },
+    surprised: { b: 'high', e: 'tiny', m: 'O', c: 0.15, fx: ['excl', 'shock', 'sweat'] },
+    blind: { b: 'blind', e: 'none', m: 'open', c: 0.55, blind: true, fx: ['question'] },
+    dizzy: { b: 'dizzy', e: 'spiral', m: 'wavy', c: 0.3, fx: ['stars'], anim: 'wobble' },
+    smug: { b: 'smug', e: 'smug', m: 'smug', c: 0.5, fx: ['sparkle'], anim: 'tiltUp' },
+    suspicious: { b: 'flat', e: 'suspicious', m: 'flat', c: 0.15, fx: ['dots', 'sweat'] },
+    oneeye: { e: 'open', eR: 'ink' }
+  };
+
+  // ---- 表情 100 こ ----
+  var FACE_GROUPS = { tsuntsun: 'つんつん', dajare: 'ダジャレ', kusuguru: 'くすぐる', common: 'いつでも', rare: 'レア' };
+  var FACES = [];
+  function F(id, name, group, recipe) { FACES.push({ id: id, name: name, group: group, recipe: recipe }); }
+  // つんつん(24) … おこるけど、たまに よろこぶ
+  F('angry', 'ぷんすか', 'tsuntsun', MOOD_RECIPES.angry);
+  F('furious', 'げきおこ', 'tsuntsun', MOOD_RECIPES.furious);
+  F('puff', 'ほっぺぷくー', 'tsuntsun', { b: 'angry2', e: ['half', { look: [0, 0], lid: 0.42 }], m: 'puffLips', puff: true, c: 1, fx: ['text:ぷー'] });
+  F('mutt', 'むっ', 'tsuntsun', { b: 'low', e: ['open', { pr: 0.4, look: [0, 0] }], m: 'frown', c: 0, fx: ['twitch', 'text:ムッ'] });
+  F('girori', 'ぎろり', 'tsuntsun', { b: 'angry', e: 'glare', m: 'flat', c: 0, tint: 'mean', fx: ['text:ギロッ'] });
+  F('chabudai', 'ちゃぶだい', 'tsuntsun', { b: 'furious', e: 'angry', m: 'shout', c: 0, tint: 'angry', fx: ['table', 'wiggle'], anim: 'shake' });
+  F('gununu', 'ぐぬぬ', 'tsuntsun', { b: 'angry2', bR: 'sad', e: 'squeeze', m: 'bite', c: 0.3, fx: ['sweat', 'text:ぐぬぬ'], anim: 'tremble' });
+  F('kora', 'こらーっ', 'tsuntsun', { b: 'furious', e: ['angry', { size: 1.12 }], m: 'shout', c: 0, tint: 'angry', fx: ['excl2', 'shock'], anim: 'jump' });
+  F('bakuhatsu', 'ばくはつ', 'tsuntsun', { b: 'none', e: 'dot', m: 'O', c: 0, body: 'soot', tint: 'soot', acc: ['afro'], fx: ['smoke'] });
+  F('iraira', 'いらいら', 'tsuntsun', { b: 'angry', e: ['half', { lidAng: 0.4, pr: 0.4, look: [0, 0] }], m: 'zigzag', c: 0, fx: ['veinMany'] });
+  F('pui', 'ぷいっ', 'tsuntsun', { b: 'flat', e: ['half', { look: [-1, 0], lid: 0.4 }], m: 'pout', c: 0.7, yaw: 0.45, anim: 'tiltL', fx: ['text:ぷいっ'] });
+  F('oni', 'おにモード', 'tsuntsun', { b: 'thick', e: 'furious', m: 'fang', c: 0, tint: 'angry', acc: ['horns'] });
+  F('meramera', 'めらめら', 'tsuntsun', { b: 'angry', e: 'fire', m: 'grinTeeth', c: 0.2, fx: ['flames'] });
+  F('shiranpuri', 'しらんぷり', 'tsuntsun', { b: 'relaxed', e: 'closed', m: 'whistle', c: 0.3, yaw: 0.35, fx: ['notes'] });
+  F('itai', 'いたっ', 'tsuntsun', { b: 'sad', e: 'squeeze', m: 'wavy', c: 0.4, fx: ['bump', 'pain'] });
+  F('bansoukou', 'ばんそうこう', 'tsuntsun', { b: 'sad', e: 'wet', m: 'sad', c: 0.3, acc: ['bandage'], fx: ['tears'] });
+  F('motto', 'もっとやって', 'tsuntsun', { b: 'happy', e: 'heart', m: 'open', c: 1, fx: ['hearts'], anim: 'sway' });
+  F('tehepero', 'てへぺろ', 'tsuntsun', { b: 'happy', e: 'open', eR: 'squeeze', m: 'tongue', c: 0.8, fx: ['star1'] });
+  F('manzara', 'まんざらでも', 'tsuntsun', { b: 'worried', e: ['open', { look: [-0.9, 0.3], lid: 0.3 }], m: 'ehe', c: 1.2, fx: ['sweat'] });
+  F('mean', 'にやり', 'tsuntsun', MOOD_RECIPES.mean);
+  F('puttsun', 'ぷっつん', 'tsuntsun', { b: 'furious', e: 'white', m: 'grit', c: 0, tint: 'angry', fx: ['vein', 'steam'], anim: 'tremble' });
+  F('gaman', 'がまんがまん', 'tsuntsun', { b: 'worried', e: 'line', m: 'bite', c: 0.5, fx: ['sweatMany'], anim: 'tremble' });
+  F('ijiiji', 'いじいじ', 'tsuntsun', { b: 'sad', e: 'dot', m: 'tiny', c: 0, tint: 'gloom', fx: ['gloom'] });
+  F('uwaan', 'うわーん', 'tsuntsun', { b: 'sad', e: 'cry', m: 'wail', c: 0.5, anim: 'tremble' });
+  // ダジャレ(22)
+  F('fuita', 'ぷぷっ', 'dajare', { b: 'happy', e: 'squeeze', m: 'puffLips', puff: true, c: 0.9, fx: ['spray'], anim: 'shake' });
+  F('samu', 'さむっ', 'dajare', { b: 'worried', e: 'dot', m: 'zigzag', c: 0, body: 'blue', tint: 'pale', fx: ['snow', 'icicle'], anim: 'tremble' });
+  F('jiwajiwa', 'じわじわ', 'dajare', { b: 'worried', e: ['half', { lid: 0.45, look: [0, 0.3] }], m: 'wobbly', c: 0.7, fx: ['sweat', 'text:じわ…'], anim: 'trembleSmall' });
+  F('ooke', 'まさかの大ウケ', 'dajare', { b: 'laugh', e: 'cryHappy', m: 'big', c: 1, fx: ['confetti'], anim: 'bounce', st: -0.03 });
+  F('akire', 'あきれがお', 'dajare', { b: 'flat', e: ['half', { lid: 0.55, look: [0.6, -0.7] }], m: 'flat', c: 0, fx: ['sigh'] });
+  F('shirome', 'しろめ', 'dajare', { b: 'high', e: 'white', m: 'O', c: 0, tint: 'pale' });
+  F('nukegara', 'ぬけがら', 'dajare', { b: 'sad', e: 'line', m: 'o', c: 0, tint: 'pale', fx: ['ghost'] });
+  F('shiin', 'しーん', 'dajare', { b: 'flat', e: 'dot', m: 'tiny', c: 0, fx: ['crow'] });
+  F('kusu', 'くすっ', 'dajare', { b: 'relaxed', e: 'closed', m: 'omega', c: 0.6 });
+  F('fuun', 'ふーん', 'dajare', { b: 'flat', bR: 'up', e: ['open', { look: [0.9, 0], pr: 0.4 }], m: 'flat', c: 0, fx: ['dots'] });
+  F('zukoo', 'ずこーっ', 'dajare', { b: 'high', e: 'x', m: 'O', c: 0.2, anim: 'tiltBig', fx: ['shock'] });
+  F('gaan', 'がーん', 'dajare', { b: 'sad', e: 'white', m: 'square', c: 0, tint: 'gloom', fx: ['lightning'] });
+  F('zabuton', 'ざぶとん1まい', 'dajare', { b: 'happy', e: 'sparkle', m: 'grinTeeth', c: 0.8, fx: ['zabuton'] });
+  F('katamatta', 'かたまった', 'dajare', { b: 'flat', e: 'dot', m: 'flat', c: 0, body: 'stone', tint: 'stone' });
+  F('nigawarai', 'にがわらい', 'dajare', { b: 'worried', e: 'happy', m: 'wavy', c: 0.4, fx: ['sweatBig'] });
+  F('pokaan', 'ぽかーん', 'dajare', { b: 'high', e: 'dot', m: 'yawnBig', c: 0, fx: ['butterfly'] });
+  F('tooime', 'とおいめ', 'dajare', { b: 'relaxed', e: ['tiny', { look: [0.5, -0.8], pr: 0.18 }], m: 'flat', c: 0, tint: 'pale', fx: ['birds'] });
+  F('mouikkai', 'もういっかい!', 'dajare', { b: 'high', e: 'big', m: 'triangle', c: 0.9, fx: ['excl'], anim: 'jump' });
+  F('shirake', 'しらけー', 'dajare', { b: 'flat', e: 'line', m: 'flat', c: 0, tint: 'grey', fx: ['wind'] });
+  F('gakkari', 'がっかり', 'dajare', { b: 'sad', e: ['half', { look: [0, 0.9] }], m: 'frown', c: 0, tint: 'sad', fx: ['sigh'] });
+  F('futon', 'ふとんがー', 'dajare', { b: 'high', e: 'tiny', m: 'O', c: 0.3, fx: ['futon'] });
+  F('osomatsu', 'おそまつさま', 'dajare', { b: 'relaxed', e: 'closed', m: 'smile', c: 0.5, anim: 'bow', fx: ['text:ペコ'] });
+  // くすぐる(19)
+  F('laugh', 'ひーひー', 'kusuguru', MOOD_RECIPES.laugh);
+  F('namidawarai', 'なみだわらい', 'kusuguru', { b: 'laugh', e: 'wet', m: 'big', c: 0.9, fx: ['laughTears'], anim: 'bounce', st: -0.025 });
+  F('koraegao', 'こらえがお', 'kusuguru', { b: 'worried', e: 'line', m: 'puffLips', puff: true, c: 1, anim: 'tremble', fx: ['text:ぷるぷる'] });
+  F('gunyagunya', 'ぐにゃぐにゃ', 'kusuguru', { b: 'relaxed', e: 'wave', m: 'wavy', c: 0.7, tint: 'pink', anim: 'squash' });
+  F('hanachouchin', 'はなちょうちん', 'kusuguru', { b: 'laugh', e: 'squeeze', m: 'open', c: 0.8, bubble: true });
+  F('koshokosho', 'こしょこしょ', 'kusuguru', { b: 'worried', e: 'squeeze', m: 'ehe', c: 1, fx: ['wiggle', 'feather'] });
+  F('yamete', 'やめてー', 'kusuguru', { b: 'sad', e: 'cryHappy', m: 'open', c: 0.8, fx: ['sweatMany'], anim: 'shake' });
+  F('waraisugi', 'わらいすぎ', 'kusuguru', { b: 'laugh', e: 'squeeze', m: 'big', c: 1.2, tint: 'pink', fx: ['snot', 'laughTears'], anim: 'bounce' });
+  F('korokoro', 'ころころ', 'kusuguru', { b: 'laugh', e: 'happy', m: 'big', c: 0.8, anim: 'roll', fx: ['notes'] });
+  F('uhyahya', 'うひゃひゃ', 'kusuguru', { b: 'laugh', bR: 'up', e: 'squeeze', eR: ['tiny', { size: 1.25 }], m: 'grinTeeth', c: 0.8, fx: ['notes'], anim: 'bounce' });
+  F('torokegao', 'とろけがお', 'kusuguru', { b: 'relaxed', e: 'closed', m: 'drool', c: 1.1, tint: 'pink', anim: 'squash', fx: ['hearts'] });
+  F('moudame', 'もうだめ…', 'kusuguru', { b: 'sad', e: 'x', m: 'tongueLoose', c: 0.3, tint: 'pale', fx: ['sweatMany'] });
+  F('pikupiku', 'ぴくぴく', 'kusuguru', { b: 'worried', bR: 'up', e: 'half', eR: 'squeeze', m: 'wavy', c: 0.5, fx: ['twitch'], anim: 'twitch' });
+  F('geragera', 'げらげら', 'kusuguru', { b: 'laugh', e: 'cryHappy', m: 'shout', c: 1, fx: ['text:ゲラゲラ'], anim: 'bounce' });
+  F('maitta', 'まいった', 'kusuguru', { b: 'worried', e: 'squeeze', m: 'open', c: 0.7, fx: ['whiteFlag', 'sweat'] });
+  F('nyanko', 'にゃんこ', 'kusuguru', { b: 'relaxed', e: 'happy', m: 'omega', c: 0.7, acc: ['catEars'], fx: ['text:にゃ'] });
+  F('shakkuri', 'しゃっくり', 'kusuguru', { b: 'high', e: 'dot', m: 'o', c: 0.4, fx: ['text:ヒック'], anim: 'jump' });
+  F('shikaeshi', 'しかえしだ', 'kusuguru', { b: 'angry2', e: 'happy', m: 'grinTeeth', c: 0.3, tint: 'mean', fx: ['sparkle'] });
+  F('dizzy', 'めがまわる', 'kusuguru', MOOD_RECIPES.dizzy);
+  // いつでも(27)
+  F('normal', 'ふつう', 'common', MOOD_RECIPES.normal);
+  F('happy', 'にこにこ', 'common', MOOD_RECIPES.happy);
+  F('sleepy', 'ねむねむ', 'common', MOOD_RECIPES.sleepy);
+  F('sad', 'なきそう', 'common', MOOD_RECIPES.sad);
+  F('shy', 'てれてれ', 'common', MOOD_RECIPES.shy);
+  F('surprised', 'びっくり', 'common', MOOD_RECIPES.surprised);
+  F('blind', 'めかくし', 'common', MOOD_RECIPES.blind);
+  F('smug', 'ドヤッ', 'common', MOOD_RECIPES.smug);
+  F('suspicious', 'じとー', 'common', MOOD_RECIPES.suspicious);
+  F('kyoton', 'きょとん', 'common', { b: 'high', e: 'dot', m: 'tiny', c: 0.5, fx: ['q1'] });
+  F('mitore', 'みとれ', 'common', { b: 'happy', e: 'sparkle', m: 'o', c: 0.9, fx: ['sparkle'] });
+  F('hirameki', 'ひらめいた', 'common', { b: 'high', e: ['open', { look: [0.3, -0.9] }], m: 'open', c: 0.5, fx: ['bulb'] });
+  F('uttori', 'うっとり', 'common', { b: 'relaxed', e: 'closed', m: 'smile', c: 1, fx: ['flowers', 'hearts'] });
+  F('kangae', 'かんがえちゅう', 'common', { b: 'flat', bR: 'up', e: ['open', { look: [0.7, -0.7] }], m: 'pout', c: 0.3, fx: ['think'] });
+  F('harapeko', 'はらぺこ', 'common', { b: 'worried', e: 'wet', m: 'drool', c: 0.4, fx: ['riceball'] });
+  F('hakushon', 'はっくしょん', 'common', { b: 'high', e: 'squeeze', m: 'O', c: 0.6, fx: ['spray', 'snot'], anim: 'jump' });
+  F('akubi', 'ふわぁ', 'common', { b: 'relaxed', e: 'line', m: 'yawnBig', c: 0.4, fx: ['tearSmall'] });
+  F('pachi', 'ぱちっ', 'common', { b: 'happy', e: 'open', eR: 'happy', m: 'smile', c: 0.6, fx: ['star1'] });
+  F('kimatta', 'きまった!', 'common', { b: 'up', e: 'open', m: 'smug', c: 0.3, acc: ['sunglasses'], fx: ['sparkle'] });
+  F('megane', 'めがねさん', 'common', { b: 'normal', e: ['open', { size: 0.9, look: [0, 0] }], m: 'ehe', c: 0.4, acc: ['glasses'] });
+  F('yaruki', 'やるき!', 'common', { b: 'angry', e: ['open', { pr: 0.55, look: [0, 0] }], m: 'grinTeeth', c: 0.5, acc: ['hachimaki'], fx: ['text:よし!'] });
+  F('buruburu', 'ぶるぶる', 'common', { b: 'sad', e: 'tiny', m: 'zigzag', c: 0, tint: 'pale', fx: ['sweatMany'], anim: 'trembleBig' });
+  F('onsen', 'いいゆだな', 'common', { b: 'relaxed', e: 'closed', m: 'smile', c: 1, acc: ['towel'], fx: ['onsen'] });
+  F('osumashi', 'おすまし', 'common', { b: 'high', e: 'closed', m: 'tiny', c: 0.6, acc: ['flower'] });
+  F('chuu', 'ちゅー', 'common', { b: 'happy', e: 'closed', m: 'kiss', c: 1, fx: ['hearts'] });
+  F('gege', 'げげっ', 'common', { b: 'worried', e: ['open', { pr: 0.3 }], m: 'grimace', c: 0, tint: 'green', fx: ['sweat'] });
+  F('suppa', 'すっぱー', 'common', { b: 'worried', e: 'squeeze', m: 'pucker', c: 0, tint: 'yellow', fx: ['lemon'] });
+  // レア(8)
+  F('kinpika', 'きんぴかだるま', 'rare', { b: 'happy', e: 'happy', m: 'open', c: 0.6, body: 'gold', tint: 'gold', fx: ['aura', 'sparkleBig'] });
+  F('hoshime', 'ほしのおめめ', 'rare', { b: 'high', e: 'star', m: 'open', c: 0.9, fx: ['sparkleBig'], anim: 'jump' });
+  F('hotoke', 'ほとけさま', 'rare', { b: 'relaxed', e: 'buddha', m: 'smile', c: 0.3, acc: ['urna'], fx: ['halo'] });
+  F('gekiga', 'げきがタッチ', 'rare', { b: 'gekiga', e: 'gekiga', m: 'gekiga', c: 0, tint: 'gekiga', fx: ['dododo'] });
+  F('hengao', 'へんがおめいじん', 'rare', { b: 'up', bR: 'sad', e: ['big', { size: 1.35, look: [0.6, 0.4] }], eR: ['tiny', { size: 0.7 }], m: 'tongue', nose: 'red', c: 0.8 });
+  F('oneeye', 'かためいり', 'rare', MOOD_RECIPES.oneeye);
+  F('shirodaruma', 'しろだるま', 'rare', { b: 'normal', e: 'open', m: 'smile', c: 0.5, body: 'white', fx: ['sparkle'] });
+  F('niji', 'にじいろだるま', 'rare', { b: 'happy', e: 'happy', m: 'open', c: 0.6, body: 'rainbow', fx: ['auraRainbow'] });
+  var FACE_BY_ID = {};
+  FACES.forEach(function (f) { FACE_BY_ID[f.id] = f; });
 
   // ---- 部品: 眉(s=-1 見て左, +1 見て右) ----
-  function drawBrow(ctx, P, b, s, faceAng) {
+  function drawBrow(ctx, P, b, s) {
+    if (!b) return;
     var mu = s * (b.iu + b.ou) / 2, mv = (b.iv + b.ov) / 2;
     feat(ctx, P, mu, mv, function () {
       var p0 = [s * b.iu - mu, b.iv - mv], p3 = [s * b.ou - mu, b.ov - mv];
@@ -312,40 +449,90 @@
       var p2 = [p0[0] + dx * 0.7, p0[1] + dy * 0.7 - b.arch * 0.9];
       ctx.fillStyle = INK;
       brush(ctx, p0, p1, p2, p3, b.w, b.w * 0.18, b.w * 0.35);
-      // 筆の毛のはね(だるまらしい ふさふさ眉)
-      ctx.fillStyle = INK;
       var tip = bez(p0, p1, p2, p3, 0.86);
       brush(ctx, tip, [tip[0] + s * 0.03, tip[1] - 0.01], [tip[0] + s * 0.06, tip[1] - 0.03], [tip[0] + s * 0.07, tip[1] - 0.07], 0.035, 0.005, 0);
     }, 0, 0.08);
   }
 
   // ---- 部品: 目 ----
-  function drawEye(ctx, P, e, s, t, blink, faceColor, lookAdd, opts) {
+  function drawEye(ctx, P, e, s, t, blink, faceColor, lookAdd) {
     if (e.type === 'none') return;
-    feat(ctx, P, s * EYE.u, EYE.v, function (c) {
-      var r = EYE.r * e.size;
+    feat(ctx, P, s * EYE.u, EYE.v, function () {
+      var r = EYE.r * e.size, i;
       ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-      if (e.type === 'arcUp') {           // にこっ(^ ^)
-        ctx.strokeStyle = INK; ctx.lineWidth = 0.065;
-        ctx.beginPath(); ctx.moveTo(-r * 0.95, r * 0.35); ctx.quadraticCurveTo(0, -r * 1.05, r * 0.95, r * 0.35); ctx.stroke();
-        return;
-      }
-      if (e.type === 'arcDown') {
-        ctx.strokeStyle = INK; ctx.lineWidth = 0.06;
-        ctx.beginPath(); ctx.moveTo(-r, 0); ctx.quadraticCurveTo(0, r * 0.8, r, 0); ctx.stroke();
-        return;
-      }
-      if (e.type === 'squeeze') {         // > <
-        ctx.strokeStyle = INK; ctx.lineWidth = 0.07;
-        var tx = -s * r * 0.75;
-        ctx.beginPath(); ctx.moveTo(s * r * 0.8, -r * 0.75); ctx.lineTo(tx, 0); ctx.lineTo(s * r * 0.8, r * 0.75); ctx.stroke();
-        return;
+      ctx.strokeStyle = INK;
+      switch (e.type) {
+        case 'arcUp':           // にこっ(^ ^)
+          ctx.lineWidth = 0.065;
+          ctx.beginPath(); ctx.moveTo(-r * 0.95, r * 0.35); ctx.quadraticCurveTo(0, -r * 1.05, r * 0.95, r * 0.35); ctx.stroke();
+          return;
+        case 'arcDown':         // すやっ(U U)
+          ctx.lineWidth = 0.06;
+          ctx.beginPath(); ctx.moveTo(-r, -r * 0.1); ctx.quadraticCurveTo(0, r * 0.75, r, -r * 0.1); ctx.stroke();
+          return;
+        case 'squeeze':         // > <
+          ctx.lineWidth = 0.07;
+          ctx.beginPath(); ctx.moveTo(s * r * 0.8, -r * 0.75); ctx.lineTo(-s * r * 0.75, 0); ctx.lineTo(s * r * 0.8, r * 0.75); ctx.stroke();
+          return;
+        case 'line':            // ぎゅっ(ー ー)
+          ctx.lineWidth = 0.07;
+          ctx.beginPath(); ctx.moveTo(-r * 1.05, 0); ctx.quadraticCurveTo(0, r * 0.12, r * 1.05, 0); ctx.stroke();
+          return;
+        case 'x':               // × ×
+          ctx.lineWidth = 0.065;
+          ctx.beginPath(); ctx.moveTo(-r * 0.75, -r * 0.75); ctx.lineTo(r * 0.75, r * 0.75); ctx.moveTo(r * 0.75, -r * 0.75); ctx.lineTo(-r * 0.75, r * 0.75); ctx.stroke();
+          return;
+        case 'wave':            // ~ ~
+          ctx.lineWidth = 0.055;
+          ctx.beginPath();
+          for (i = 0; i <= 16; i++) { var wx = -r * 1.05 + r * 2.1 * i / 16, wy = Math.sin(i / 16 * TAU * 1.5 + t * 6) * r * 0.28; if (i) ctx.lineTo(wx, wy); else ctx.moveTo(wx, wy); }
+          ctx.stroke();
+          return;
+        case 'dot':             // ・ ・(きょとん)
+          ctx.fillStyle = INK;
+          ctx.beginPath(); ctx.ellipse(0, r * 0.05, r * 0.36, r * 0.46, 0, 0, TAU); ctx.fill();
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath(); ctx.arc(-r * 0.1, -r * 0.14, r * 0.12, 0, TAU); ctx.fill();
+          return;
+        case 'star': {          // ★
+          var sp = 1 + 0.08 * Math.sin(t * 8);
+          var sg = ctx.createRadialGradient(-r * 0.2, -r * 0.3, 0, 0, 0, r * 1.2);
+          sg.addColorStop(0, '#fffbd0'); sg.addColorStop(0.5, '#ffd23a'); sg.addColorStop(1, '#f08a00');
+          ctx.fillStyle = sg; star(ctx, 0, r * 0.08, r * 1.25 * sp, 5, 0.48, 0); ctx.fill();
+          ctx.lineWidth = 0.03; ctx.stroke();
+          ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(-r * 0.22, -r * 0.2, r * 0.16, 0, TAU); ctx.fill();
+          return;
+        }
+        case 'heart': {         // ♥
+          var hp = 1 + 0.1 * Math.abs(Math.sin(t * 6));
+          ctx.fillStyle = '#ff3d7f'; heart(ctx, 0, r * 0.42 * hp, r * 1.25 * hp); ctx.fill();
+          ctx.lineWidth = 0.03; ctx.stroke();
+          ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.ellipse(-r * 0.4, -r * 0.35, r * 0.16, r * 0.11, -0.6, 0, TAU); ctx.fill();
+          return;
+        }
       }
       // 白目
       ctx.beginPath(); ctx.ellipse(0, 0, r, r * 1.04, 0, 0, TAU);
-      ctx.fillStyle = '#ffffff'; ctx.fill();
-      if (e.type === 'blank') {           // 伝統の「まだ黒目を入れていない」目
-        ctx.lineWidth = 0.035; ctx.strokeStyle = INK; ctx.stroke();
+      if (e.glow) {
+        var gg = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+        gg.addColorStop(0, '#ffffff'); gg.addColorStop(0.55, '#fff59a'); gg.addColorStop(1, '#ffb21e');
+        ctx.save(); ctx.shadowColor = 'rgba(255,225,60,0.95)'; ctx.shadowBlur = P.R * 0.35;
+        ctx.fillStyle = gg; ctx.fill(); ctx.restore();
+      } else { ctx.fillStyle = '#ffffff'; ctx.fill(); }
+      if (e.type === 'blank') {           // 白目だけ
+        ctx.lineWidth = 0.04; ctx.strokeStyle = INK; ctx.stroke();
+        return;
+      }
+      if (e.type === 'ink') {             // 筆で入れた 伝統の黒目
+        ctx.lineWidth = 0.04; ctx.stroke();
+        ctx.fillStyle = '#111111';
+        ctx.beginPath();
+        for (i = 0; i <= 18; i++) {
+          var a = i / 18 * TAU, rr = r * (0.62 + 0.06 * Math.sin(a * 3 + 1) + 0.03 * Math.sin(a * 7));
+          if (i) ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr + r * 0.04); else ctx.moveTo(Math.cos(a) * rr, Math.sin(a) * rr + r * 0.04);
+        }
+        ctx.closePath(); ctx.fill();
+        brush(ctx, [r * 0.3, -r * 0.45], [r * 0.5, -r * 0.6], [r * 0.6, -r * 0.7], [r * 0.75, -r * 0.8], 0.05, 0.01, 0);
         return;
       }
       if (e.type === 'spiral') {          // ぐるぐる目
@@ -354,9 +541,9 @@
         ctx.rotate(t * 7 * s);
         ctx.strokeStyle = INK; ctx.lineWidth = 0.032;
         ctx.beginPath();
-        for (var i = 0; i <= 60; i++) {
-          var a = i / 60 * TAU * 2.6, rr = r * 0.92 * i / 60;
-          if (i) ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); else ctx.moveTo(0, 0);
+        for (i = 0; i <= 60; i++) {
+          var sa = i / 60 * TAU * 2.6, sr = r * 0.92 * i / 60;
+          if (i) ctx.lineTo(Math.cos(sa) * sr, Math.sin(sa) * sr); else ctx.moveTo(0, 0);
         }
         ctx.stroke();
         ctx.restore();
@@ -364,7 +551,8 @@
         ctx.lineWidth = 0.035; ctx.strokeStyle = INK; ctx.stroke();
         return;
       }
-      var lid = Math.max(e.lid, 1 - blink);
+      var lid = e.lid + (e.sway ? 0.14 * Math.sin(t * 1.3) : 0);
+      lid = Math.max(lid, 1 - blink);
       if (lid > 0.9) {                    // 閉じた目(まばたき)
         ctx.fillStyle = faceColor;
         ctx.beginPath(); ctx.ellipse(0, 0, r * 1.06, r * 1.1, 0, 0, TAU); ctx.fill();
@@ -374,27 +562,45 @@
       }
       ctx.save();
       ctx.beginPath(); ctx.ellipse(0, 0, r, r * 1.04, 0, 0, TAU); ctx.clip();
-      // うるうる(下に水)
       if (e.wet) {
         ctx.fillStyle = 'rgba(120,190,255,0.45)';
         ctx.beginPath(); ctx.ellipse(0, r * 0.95, r * 1.1, r * 0.45, 0, 0, TAU); ctx.fill();
       }
-      // 黒目
       var lx = clamp(e.look[0] + lookAdd[0], -1, 1), ly = clamp(e.look[1] + lookAdd[1], -1, 1);
       var pr = r * e.pr, px = lx * (r - pr) * 0.9, py = ly * (r - pr) * 0.9;
-      ctx.fillStyle = INK;
-      ctx.beginPath(); ctx.arc(px, py, pr, 0, TAU); ctx.fill();
-      // 黒目の中の茶色(やわらかく)
-      ctx.fillStyle = '#4a2a1a';
-      ctx.beginPath(); ctx.arc(px, py + pr * 0.25, pr * 0.62, 0, TAU); ctx.fill();
-      ctx.fillStyle = INK;
-      ctx.beginPath(); ctx.arc(px, py, pr * 0.42, 0, TAU); ctx.fill();
-      // 光
-      ctx.fillStyle = '#ffffff';
-      var hl = e.wet ? 1.35 : 1;
-      ctx.beginPath(); ctx.arc(px - pr * 0.36, py - pr * 0.4, pr * 0.34 * hl, 0, TAU); ctx.fill();
-      ctx.beginPath(); ctx.arc(px + pr * 0.38, py + pr * 0.34, pr * 0.15 * hl, 0, TAU); ctx.fill();
-      if (e.wet) { ctx.beginPath(); ctx.arc(px + pr * 0.1, py - pr * 0.62, pr * 0.1, 0, TAU); ctx.fill(); }
+      if (e.fire) {                       // 目の中が炎
+        var fl = 1 + 0.1 * Math.sin(t * 22);
+        var fgr = ctx.createLinearGradient(0, r, 0, -r);
+        fgr.addColorStop(0, '#d61a0a'); fgr.addColorStop(0.5, '#ff7a12'); fgr.addColorStop(1, '#ffe04a');
+        ctx.fillStyle = fgr;
+        ctx.beginPath(); ctx.moveTo(0, r * 0.85);
+        ctx.bezierCurveTo(r * 0.85, r * 0.6, r * 0.5, -r * 0.3 * fl, r * 0.1, -r * 0.95 * fl);
+        ctx.bezierCurveTo(-r * 0.05, -r * 0.45, -r * 0.35, -r * 0.5 * fl, -r * 0.4, -r * 0.7 * fl);
+        ctx.bezierCurveTo(-r * 0.9, -r * 0.1, -r * 0.7, r * 0.6, 0, r * 0.85);
+        ctx.fill();
+        ctx.fillStyle = '#fff6a8';
+        ctx.beginPath(); ctx.ellipse(0, r * 0.4, r * 0.25, r * 0.38 * fl, 0, 0, TAU); ctx.fill();
+      } else if (!e.glow) {
+        ctx.fillStyle = INK;
+        ctx.beginPath(); ctx.arc(px, py, pr, 0, TAU); ctx.fill();
+        if (!e.gek) {
+          ctx.fillStyle = '#4a2a1a';
+          ctx.beginPath(); ctx.arc(px, py + pr * 0.25, pr * 0.62, 0, TAU); ctx.fill();
+          ctx.fillStyle = INK;
+          ctx.beginPath(); ctx.arc(px, py, pr * 0.42, 0, TAU); ctx.fill();
+        }
+        ctx.fillStyle = '#ffffff';
+        var hl = e.wet ? 1.35 : 1;
+        ctx.beginPath(); ctx.arc(px - pr * 0.36, py - pr * 0.4, pr * 0.34 * hl, 0, TAU); ctx.fill();
+        ctx.beginPath(); ctx.arc(px + pr * 0.38, py + pr * 0.34, pr * 0.15 * hl, 0, TAU); ctx.fill();
+        if (e.wet) { ctx.beginPath(); ctx.arc(px + pr * 0.1, py - pr * 0.62, pr * 0.1, 0, TAU); ctx.fill(); }
+        if (e.sparkle) {
+          var tw = 0.75 + 0.25 * Math.sin(t * 7);
+          sparkle(ctx, px + pr * 0.35, py - pr * 0.3, pr * 0.42 * tw, '#ffffff');
+          ctx.fillStyle = 'rgba(255,170,220,0.9)';
+          star(ctx, px - pr * 0.25, py + pr * 0.42, pr * 0.2, 5, 0.5, 0); ctx.fill();
+        }
+      }
       // 上まぶた
       if (lid > 0.01) {
         var k = -s * Math.tan(e.lidAng), y0 = -r * 1.04 + 2 * r * 1.04 * lid;
@@ -402,7 +608,7 @@
         ctx.beginPath();
         ctx.moveTo(-r * 1.2, y0 - k * r * 1.2); ctx.lineTo(r * 1.2, y0 + k * r * 1.2);
         ctx.lineTo(r * 1.2, -r * 1.4); ctx.lineTo(-r * 1.2, -r * 1.4); ctx.closePath(); ctx.fill();
-        ctx.strokeStyle = INK; ctx.lineWidth = 0.05;
+        ctx.strokeStyle = INK; ctx.lineWidth = e.gek ? 0.07 : 0.05;
         ctx.beginPath(); ctx.moveTo(-r * 1.2, y0 - k * r * 1.2); ctx.lineTo(r * 1.2, y0 + k * r * 1.2); ctx.stroke();
       }
       // 下まぶた
@@ -416,9 +622,15 @@
       }
       ctx.restore();
       ctx.beginPath(); ctx.ellipse(0, 0, r, r * 1.04, 0, 0, TAU);
-      ctx.lineWidth = 0.04; ctx.strokeStyle = INK; ctx.stroke();
-      // まつげ(外がわに2本・かわいさ)
-      if (lid < 0.4 && !e.wet) {
+      ctx.lineWidth = e.gek ? 0.06 : 0.04; ctx.strokeStyle = INK; ctx.stroke();
+      if (e.gek) {                        // 劇画の影線
+        ctx.lineWidth = 0.022;
+        ctx.beginPath();
+        for (i = 0; i < 4; i++) { ctx.moveTo(-r * 0.8 + i * r * 0.45, r * 1.25); ctx.lineTo(-r * 0.6 + i * r * 0.45, r * 1.6); }
+        ctx.stroke();
+      }
+      // まつげ
+      if (lid < 0.4 && !e.wet && !e.gek && !e.glow) {
         ctx.lineWidth = 0.03;
         ctx.beginPath();
         ctx.moveTo(s * r * 0.82, -r * 0.62); ctx.lineTo(s * r * 1.08, -r * 0.86);
@@ -429,13 +641,15 @@
   }
 
   // ---- 部品: 口 ----
+  var CLOSED_MOUTHS = { smile: 1, wavy: 1, flat: 1, omega: 1, frown: 1, ehe: 1, tiny: 1, pout: 1, puffLips: 1, smileBig: 1,
+    fang: 1, gekiga: 1, whistle: 1, kiss: 1, pucker: 1, bite: 1, zigzag: 1, wobbly: 1 };
   function drawMouth(ctx, P, type, t) {
     feat(ctx, P, 0, MOUTH_V, function () {
       ctx.scale(MS, MS);
       ctx.lineCap = 'round'; ctx.lineJoin = 'round';
       ctx.strokeStyle = INK; ctx.lineWidth = 0.038;
-      var inside = '#9b2228', tongue = '#ff8a92';
-      function dMouth(w, d) {
+      var inside = '#9b2228', tongue = '#ff8a92', i;
+      function dMouth(w, d, teeth) {
         function pth() {
           ctx.beginPath();
           ctx.moveTo(-w, -0.02); ctx.quadraticCurveTo(0, 0.01, w, -0.02);
@@ -446,42 +660,96 @@
         ctx.save(); ctx.clip();
         ctx.fillStyle = tongue;
         ctx.beginPath(); ctx.ellipse(0, d * 0.8, w * 0.6, d * 0.36, 0, 0, TAU); ctx.fill();
-        // 上の歯
         ctx.fillStyle = '#ffffff';
-        ctx.fillRect(-w, -0.04, w * 2, 0.045);
+        ctx.fillRect(-w, -0.04, w * 2, teeth || 0.045);
+        if (teeth) {
+          ctx.lineWidth = 0.016;
+          ctx.beginPath();
+          for (i = -3; i <= 3; i++) { ctx.moveTo(i * w / 3.5, -0.04); ctx.lineTo(i * w / 3.5, -0.04 + teeth); }
+          ctx.moveTo(-w, -0.04 + teeth); ctx.lineTo(w, -0.04 + teeth);
+          ctx.stroke();
+        }
         ctx.restore();
-        pth(); ctx.stroke();
+        ctx.lineWidth = 0.038; pth(); ctx.stroke();
+      }
+      function oval(x, y, rx, ry, tg) {
+        ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, TAU);
+        ctx.fillStyle = inside; ctx.fill();
+        if (tg) {
+          ctx.save(); ctx.clip(); ctx.fillStyle = tongue;
+          ctx.beginPath(); ctx.ellipse(x, y + ry * 0.8, rx * 0.75, ry * 0.4, 0, 0, TAU); ctx.fill(); ctx.restore();
+          ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, TAU);
+        }
+        ctx.stroke();
       }
       switch (type) {
         case 'open': dMouth(0.11, 0.14); break;
-        case 'big': {
-          var o = 0.2 + 0.03 * Math.sin(t * 24);
-          dMouth(0.16, o);
+        case 'big': dMouth(0.16, 0.2 + 0.03 * Math.sin(t * 24)); break;
+        case 'grinTeeth': dMouth(0.17, 0.14, 0.075); break;
+        case 'triangle':
+          ctx.beginPath(); ctx.moveTo(-0.1, -0.03); ctx.lineTo(0.1, -0.03); ctx.lineTo(0, 0.13); ctx.closePath();
+          ctx.fillStyle = inside; ctx.fill();
+          ctx.save(); ctx.clip(); ctx.fillStyle = tongue; ctx.beginPath(); ctx.ellipse(0, 0.11, 0.05, 0.04, 0, 0, TAU); ctx.fill(); ctx.restore();
+          ctx.beginPath(); ctx.moveTo(-0.1, -0.03); ctx.lineTo(0.1, -0.03); ctx.lineTo(0, 0.13); ctx.closePath(); ctx.stroke();
           break;
-        }
         case 'grit': {
-          ctx.beginPath();
-          ctx.moveTo(-0.15, 0.06);
-          ctx.bezierCurveTo(-0.1, -0.06, 0.1, -0.06, 0.15, 0.06);
-          ctx.bezierCurveTo(0.07, 0.1, -0.07, 0.1, -0.15, 0.06);
-          ctx.closePath();
-          ctx.fillStyle = '#ffffff'; ctx.fill();
+          var gp = function () {
+            ctx.beginPath();
+            ctx.moveTo(-0.15, 0.06);
+            ctx.bezierCurveTo(-0.1, -0.06, 0.1, -0.06, 0.15, 0.06);
+            ctx.bezierCurveTo(0.07, 0.1, -0.07, 0.1, -0.15, 0.06);
+            ctx.closePath();
+          };
+          gp(); ctx.fillStyle = '#ffffff'; ctx.fill();
           ctx.save(); ctx.clip();
           ctx.lineWidth = 0.022;
           ctx.beginPath();
           ctx.moveTo(-0.16, 0.035); ctx.quadraticCurveTo(0, 0.0, 0.16, 0.035);
-          for (var i = -2; i <= 2; i++) { ctx.moveTo(i * 0.055, -0.06); ctx.lineTo(i * 0.055, 0.12); }
+          for (i = -2; i <= 2; i++) { ctx.moveTo(i * 0.055, -0.06); ctx.lineTo(i * 0.055, 0.12); }
           ctx.stroke();
           ctx.restore();
-          ctx.lineWidth = 0.038;
-          ctx.beginPath();
-          ctx.moveTo(-0.15, 0.06);
-          ctx.bezierCurveTo(-0.1, -0.06, 0.1, -0.06, 0.15, 0.06);
-          ctx.bezierCurveTo(0.07, 0.1, -0.07, 0.1, -0.15, 0.06);
-          ctx.closePath(); ctx.stroke();
+          ctx.lineWidth = 0.038; gp(); ctx.stroke();
           break;
         }
-        case 'smirk': { // にやり(片方だけ上がった、歯の見える笑い)
+        case 'grimace': {   // げっ: 横長に歯を食いしばる
+          var gm = function () {
+            ctx.beginPath(); ctx.moveTo(-0.17, 0.05); ctx.quadraticCurveTo(-0.16, -0.03, -0.1, -0.03); ctx.lineTo(0.1, -0.03);
+            ctx.quadraticCurveTo(0.16, -0.03, 0.17, 0.05); ctx.quadraticCurveTo(0, 0.05, -0.17, 0.05); ctx.closePath();
+          };
+          gm(); ctx.fillStyle = '#ffffff'; ctx.fill();
+          ctx.save(); ctx.clip(); ctx.lineWidth = 0.018; ctx.beginPath();
+          ctx.moveTo(-0.17, 0.012); ctx.lineTo(0.17, 0.012);
+          for (i = -4; i <= 4; i++) { ctx.moveTo(i * 0.035, -0.04); ctx.lineTo(i * 0.035, 0.06); }
+          ctx.stroke(); ctx.restore();
+          ctx.lineWidth = 0.035; gm(); ctx.stroke();
+          break;
+        }
+        case 'shout': {     // さけぶ: 上下の歯つき
+          var sh = function () {
+            ctx.beginPath(); ctx.moveTo(-0.13, -0.05); ctx.lineTo(0.13, -0.05);
+            ctx.quadraticCurveTo(0.17, 0.15, 0.0, 0.18); ctx.quadraticCurveTo(-0.17, 0.15, -0.13, -0.05); ctx.closePath();
+          };
+          sh(); ctx.fillStyle = inside; ctx.fill();
+          ctx.save(); ctx.clip();
+          ctx.fillStyle = tongue; ctx.beginPath(); ctx.ellipse(0, 0.17, 0.08, 0.05, 0, 0, TAU); ctx.fill();
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath(); ctx.moveTo(-0.15, -0.06);
+          for (i = 0; i <= 6; i++) { ctx.lineTo(-0.15 + i * 0.05, -0.06 + (i % 2 ? 0.05 : 0.025)); }
+          ctx.lineTo(0.16, -0.06); ctx.closePath(); ctx.fill();
+          ctx.beginPath(); ctx.moveTo(-0.12, 0.2); ctx.lineTo(-0.08, 0.12); ctx.lineTo(-0.04, 0.2); ctx.moveTo(0.04, 0.2); ctx.lineTo(0.08, 0.12); ctx.lineTo(0.12, 0.2); ctx.fill();
+          ctx.restore();
+          sh(); ctx.stroke();
+          break;
+        }
+        case 'square':      // がーん: 四角い口
+          ctx.save(); rrect(ctx, -0.12, -0.05, 0.24, 0.14, 0.03); ctx.fillStyle = inside; ctx.fill(); ctx.clip();
+          ctx.fillStyle = '#ffffff'; ctx.fillRect(-0.13, -0.06, 0.26, 0.05); ctx.fillRect(-0.13, 0.055, 0.26, 0.04);
+          ctx.lineWidth = 0.015; ctx.beginPath();
+          for (i = -3; i <= 3; i++) { ctx.moveTo(i * 0.035, -0.06); ctx.lineTo(i * 0.035, -0.01); ctx.moveTo(i * 0.035, 0.055); ctx.lineTo(i * 0.035, 0.1); }
+          ctx.stroke(); ctx.restore();
+          rrect(ctx, -0.12, -0.05, 0.24, 0.14, 0.03); ctx.stroke();
+          break;
+        case 'smirk': {
           var sm = function () {
             ctx.beginPath();
             ctx.moveTo(-0.13, 0.03);
@@ -494,30 +762,87 @@
           ctx.fillStyle = '#fff';
           ctx.beginPath(); ctx.moveTo(-0.14, 0.02); ctx.quadraticCurveTo(0.0, 0.045, 0.16, -0.08); ctx.lineTo(0.16, 0.0); ctx.quadraticCurveTo(0.0, 0.09, -0.14, 0.05); ctx.closePath(); ctx.fill();
           ctx.lineWidth = 0.015;
-          for (var ti = -2; ti <= 3; ti++) { ctx.beginPath(); ctx.moveTo(ti * 0.045, -0.1); ctx.lineTo(ti * 0.045 + 0.01, 0.08); ctx.stroke(); }
+          for (i = -2; i <= 3; i++) { ctx.beginPath(); ctx.moveTo(i * 0.045, -0.1); ctx.lineTo(i * 0.045 + 0.01, 0.08); ctx.stroke(); }
           ctx.restore();
           ctx.lineWidth = 0.035; sm(); ctx.stroke();
-          // えくぼ
           ctx.lineWidth = 0.025;
           ctx.beginPath(); ctx.moveTo(0.14, -0.12); ctx.quadraticCurveTo(0.2, -0.08, 0.17, -0.03); ctx.stroke();
           break;
         }
         case 'yawn': {
           var ph = fract(t / 4.2), op = ph < 0.35 ? Math.sin(ph / 0.35 * PI) : 0;
-          var rx = 0.05 + 0.04 * op, ry = 0.045 + 0.08 * op;
-          ctx.beginPath(); ctx.ellipse(0, 0.02 + ry * 0.3, rx, ry, 0, 0, TAU);
-          ctx.fillStyle = inside; ctx.fill(); ctx.stroke();
+          oval(0, 0.02 + (0.045 + 0.08 * op) * 0.3, 0.05 + 0.04 * op, 0.045 + 0.08 * op, false);
           break;
         }
-        case 'O':
-          ctx.beginPath(); ctx.ellipse(0, 0.045, 0.08, 0.105, 0, 0, TAU);
-          ctx.fillStyle = inside; ctx.fill();
-          ctx.save(); ctx.clip(); ctx.fillStyle = tongue;
-          ctx.beginPath(); ctx.ellipse(0, 0.13, 0.06, 0.04, 0, 0, TAU); ctx.fill(); ctx.restore();
-          ctx.beginPath(); ctx.ellipse(0, 0.045, 0.08, 0.105, 0, 0, TAU);
+        case 'yawnBig': oval(0, 0.07, 0.09, 0.13, true); break;
+        case 'O': oval(0, 0.045, 0.08, 0.105, true); break;
+        case 'o': oval(0, 0.03, 0.045, 0.055, false); break;
+        case 'whistle':
+          ctx.lineWidth = 0.04; oval(0.03, 0.015, 0.032, 0.032, false);
+          break;
+        case 'drool': {
+          oval(0, 0.025, 0.06, 0.05, false);
+          var dl = 0.04 + 0.03 * Math.sin(t * 2);
+          ctx.strokeStyle = 'rgba(120,190,255,0.95)'; ctx.lineWidth = 0.022;
+          ctx.beginPath(); ctx.moveTo(0.05, 0.05); ctx.lineTo(0.06, 0.06 + dl); ctx.stroke();
+          ctx.fillStyle = 'rgba(150,210,255,0.95)'; ctx.strokeStyle = '#2f78c4'; ctx.lineWidth = 0.012;
+          drop(ctx, 0.06, 0.08 + dl, 0.03); ctx.fill(); ctx.stroke();
+          break;
+        }
+        case 'tongue':      // てへぺろ
+          ctx.beginPath(); ctx.moveTo(-0.11, -0.02); ctx.quadraticCurveTo(0, 0.07, 0.11, -0.02); ctx.stroke();
+          ctx.fillStyle = tongue; ctx.lineWidth = 0.025;
+          ctx.beginPath(); ctx.moveTo(0.0, 0.025); ctx.quadraticCurveTo(-0.005, 0.13, 0.05, 0.13); ctx.quadraticCurveTo(0.1, 0.13, 0.09, 0.015); ctx.closePath(); ctx.fill(); ctx.stroke();
+          ctx.lineWidth = 0.014; ctx.beginPath(); ctx.moveTo(0.045, 0.04); ctx.lineTo(0.048, 0.095); ctx.stroke();
+          break;
+        case 'tongueLoose': // ぐったり、舌がでろーん
+          oval(0, 0.02, 0.07, 0.05, false);
+          ctx.fillStyle = tongue; ctx.lineWidth = 0.022;
+          ctx.beginPath(); ctx.moveTo(-0.03, 0.04); ctx.quadraticCurveTo(-0.02, 0.2, 0.05, 0.22); ctx.quadraticCurveTo(0.1, 0.2, 0.04, 0.04); ctx.closePath(); ctx.fill(); ctx.stroke();
+          break;
+        case 'pout':        // むすっ(すぼめた口)
+          ctx.beginPath(); ctx.ellipse(0, 0.02, 0.045, 0.03, 0, 0, TAU); ctx.fillStyle = '#e0606a'; ctx.fill(); ctx.lineWidth = 0.03; ctx.stroke();
+          ctx.lineWidth = 0.018; ctx.beginPath(); ctx.moveTo(-0.075, 0.005); ctx.lineTo(-0.06, 0.02); ctx.moveTo(0.075, 0.005); ctx.lineTo(0.06, 0.02); ctx.stroke();
+          break;
+        case 'kiss':        // ちゅー(3の口)
+          ctx.lineWidth = 0.04; ctx.strokeStyle = '#c0283a';
+          ctx.beginPath(); ctx.moveTo(-0.035, -0.06); ctx.quadraticCurveTo(0.08, -0.06, 0.0, 0.0); ctx.quadraticCurveTo(0.08, 0.06, -0.035, 0.06); ctx.stroke();
+          break;
+        case 'pucker':      // すっぱい(しわしわ)
+          ctx.beginPath(); ctx.arc(0, 0.02, 0.03, 0, TAU); ctx.fillStyle = inside; ctx.fill(); ctx.lineWidth = 0.03; ctx.stroke();
+          ctx.lineWidth = 0.016; ctx.beginPath();
+          for (i = 0; i < 8; i++) { var pa = i / 8 * TAU; ctx.moveTo(Math.cos(pa) * 0.045, 0.02 + Math.sin(pa) * 0.045); ctx.lineTo(Math.cos(pa) * 0.075, 0.02 + Math.sin(pa) * 0.075); }
           ctx.stroke();
           break;
-        case 'sad': { // への字に開いた、泣き出しそうな口
+        case 'puffLips':    // ぷくー(口をぎゅっと)
+          ctx.lineWidth = 0.04; ctx.beginPath(); ctx.moveTo(-0.05, 0.02); ctx.quadraticCurveTo(0, 0.035, 0.05, 0.02); ctx.stroke();
+          ctx.lineWidth = 0.018; ctx.beginPath(); ctx.arc(-0.065, 0.02, 0.018, -1, 1); ctx.moveTo(0.065, 0.02); ctx.arc(0.065, 0.02, 0.018, PI - 1, PI + 1); ctx.stroke();
+          break;
+        case 'bite': {      // ぐぬぬ(下くちびるをかむ)
+          var bw = Math.sin(t * 30) * 0.004;
+          ctx.beginPath(); ctx.moveTo(-0.12, 0.05); ctx.quadraticCurveTo(-0.06, 0.0 + bw, 0, 0.03); ctx.quadraticCurveTo(0.06, 0.0 - bw, 0.12, 0.05); ctx.stroke();
+          ctx.fillStyle = '#ffffff'; ctx.lineWidth = 0.018;
+          ctx.fillRect(-0.04, 0.0, 0.038, 0.04); ctx.strokeRect(-0.04, 0.0, 0.038, 0.04);
+          ctx.fillRect(0.002, 0.0, 0.038, 0.04); ctx.strokeRect(0.002, 0.0, 0.038, 0.04);
+          break;
+        }
+        case 'zigzag':      // ガタガタ
+          ctx.beginPath();
+          for (i = 0; i <= 8; i++) { var zx = -0.13 + i * 0.0325, zy = (i % 2 ? -0.025 : 0.03) + Math.sin(t * 40 + i) * 0.004; if (i) ctx.lineTo(zx, zy); else ctx.moveTo(zx, zy); }
+          ctx.stroke();
+          break;
+        case 'wail': {      // うわーん(大きな への字)
+          var wl = Math.sin(t * 30) * 0.006;
+          var wp = function () {
+            ctx.beginPath(); ctx.moveTo(-0.16, 0.13); ctx.quadraticCurveTo(-0.14, -0.06 + wl, 0, -0.06); ctx.quadraticCurveTo(0.14, -0.06 - wl, 0.16, 0.13);
+            ctx.quadraticCurveTo(0, 0.09, -0.16, 0.13); ctx.closePath();
+          };
+          wp(); ctx.fillStyle = inside; ctx.fill();
+          ctx.save(); ctx.clip(); ctx.fillStyle = tongue; ctx.beginPath(); ctx.ellipse(0, 0.12, 0.09, 0.05, 0, 0, TAU); ctx.fill(); ctx.restore();
+          wp(); ctx.stroke();
+          break;
+        }
+        case 'sad': {
           var tr = Math.sin(t * 30) * 0.006;
           var sp = function () {
             ctx.beginPath(); ctx.moveTo(-0.11, 0.08);
@@ -527,22 +852,16 @@
           sp(); ctx.fillStyle = inside; ctx.fill(); ctx.stroke();
           break;
         }
-        case 'wavy': {
-          ctx.beginPath(); ctx.moveTo(-0.11, 0.01);
+        case 'frown':
+          ctx.beginPath(); ctx.moveTo(-0.1, 0.05); ctx.quadraticCurveTo(0, -0.04, 0.1, 0.05); ctx.stroke();
+          break;
+        case 'wavy': case 'wobbly': {
+          var wa = type === 'wobbly' ? Math.sin(t * 25) * 0.01 : 0;
+          ctx.beginPath(); ctx.moveTo(-0.11, 0.01 - (type === 'wobbly' ? 0.02 : 0));
           for (var j = 1; j <= 4; j++) {
-            ctx.quadraticCurveTo(-0.11 + (j - 0.5) * 0.055, (j % 2 ? -0.035 : 0.055), -0.11 + j * 0.055, 0.01);
+            ctx.quadraticCurveTo(-0.11 + (j - 0.5) * 0.055, (j % 2 ? -0.035 : 0.055) + wa, -0.11 + j * 0.055, 0.01 + (type === 'wobbly' && j === 4 ? -0.02 : 0));
           }
           ctx.stroke();
-          break;
-        }
-        case 'smug': { // ドヤ: 口角が きゅっと上がった 大きめの笑み
-          ctx.beginPath(); ctx.moveTo(-0.15, -0.05);
-          ctx.quadraticCurveTo(-0.12, 0.02, -0.06, 0.03);
-          ctx.quadraticCurveTo(0, 0.045, 0.06, 0.03);
-          ctx.quadraticCurveTo(0.12, 0.02, 0.15, -0.05);
-          ctx.stroke();
-          ctx.lineWidth = 0.025;
-          ctx.beginPath(); ctx.moveTo(-0.17, -0.08); ctx.lineTo(-0.13, -0.03); ctx.moveTo(0.17, -0.08); ctx.lineTo(0.13, -0.03); ctx.stroke();
           break;
         }
         case 'omega':
@@ -551,8 +870,38 @@
           ctx.quadraticCurveTo(0.07, 0.08, 0.13, -0.03);
           ctx.stroke();
           break;
+        case 'smug':
+          ctx.beginPath(); ctx.moveTo(-0.15, -0.05);
+          ctx.quadraticCurveTo(-0.12, 0.02, -0.06, 0.03);
+          ctx.quadraticCurveTo(0, 0.045, 0.06, 0.03);
+          ctx.quadraticCurveTo(0.12, 0.02, 0.15, -0.05);
+          ctx.stroke();
+          ctx.lineWidth = 0.025;
+          ctx.beginPath(); ctx.moveTo(-0.17, -0.08); ctx.lineTo(-0.13, -0.03); ctx.moveTo(0.17, -0.08); ctx.lineTo(0.13, -0.03); ctx.stroke();
+          break;
+        case 'ehe':         // えへへ(はしが くるっ)
+          ctx.beginPath(); ctx.moveTo(-0.13, -0.035); ctx.quadraticCurveTo(-0.13, 0.005, -0.1, 0.0);
+          ctx.quadraticCurveTo(0, 0.07, 0.1, 0.0); ctx.quadraticCurveTo(0.13, 0.005, 0.13, -0.035); ctx.stroke();
+          break;
+        case 'fang':        // にっ(きばつき)
+          ctx.beginPath(); ctx.moveTo(-0.13, -0.02); ctx.quadraticCurveTo(0, 0.07, 0.13, -0.02); ctx.stroke();
+          ctx.fillStyle = '#ffffff'; ctx.lineWidth = 0.018;
+          [-1, 1].forEach(function (q) {
+            ctx.beginPath(); ctx.moveTo(q * 0.075, 0.02); ctx.lineTo(q * 0.04, 0.03); ctx.lineTo(q * 0.06, 0.09); ctx.closePath(); ctx.fill(); ctx.stroke();
+          });
+          break;
+        case 'gekiga':
+          ctx.lineWidth = 0.055; ctx.beginPath(); ctx.moveTo(-0.13, 0.025); ctx.lineTo(0.13, 0.015); ctx.stroke();
+          ctx.lineWidth = 0.02; ctx.beginPath(); ctx.moveTo(-0.05, 0.075); ctx.lineTo(0.05, 0.075); ctx.moveTo(-0.17, 0.0); ctx.lineTo(-0.15, 0.05); ctx.moveTo(0.17, 0.0); ctx.lineTo(0.15, 0.05); ctx.stroke();
+          break;
+        case 'tiny':
+          ctx.fillStyle = INK; ctx.beginPath(); ctx.ellipse(0, 0.015, 0.024, 0.02, 0, 0, TAU); ctx.fill();
+          break;
         case 'flat':
           ctx.beginPath(); ctx.moveTo(-0.08, 0.02); ctx.lineTo(0.08, 0.02); ctx.stroke();
+          break;
+        case 'smileBig':
+          ctx.beginPath(); ctx.moveTo(-0.15, -0.04); ctx.quadraticCurveTo(0, 0.1, 0.15, -0.04); ctx.stroke();
           break;
         default: // smile
           ctx.beginPath(); ctx.moveTo(-0.1, -0.015); ctx.quadraticCurveTo(0, 0.08, 0.1, -0.015); ctx.stroke();
@@ -561,9 +910,8 @@
   }
 
   // ---- 部品: ひげ(鼻の下の口ひげ と あごひげ) ----
-  function drawMustache(ctx, P, s, mood, t) {
-    var lift = (mood === 'angry' || mood === 'furious') ? -0.02 : (mood === 'laugh' || mood === 'happy') ? -0.025 : (mood === 'sad') ? 0.02 : 0;
-    var wig = (mood === 'laugh') ? Math.sin(t * 24) * 0.012 : 0;
+  function drawMustache(ctx, P, s, S, t) {
+    var lift = S.st, wig = S.wig ? Math.sin(t * 24) * 0.012 : 0;
     feat(ctx, P, s * 0.19, 0.115, function () {
       ctx.fillStyle = INK;
       var o = -s * 0.19;
@@ -571,10 +919,9 @@
         [o + s * 0.37, -0.04 + lift + wig], 0.085, 0.014, 0.012);
     }, 0, 0.08);
   }
-  function drawBeard(ctx, P, mood) {
-    if (mood !== 'smile' && mood !== 'wavy' && mood !== 'flat' && mood !== 'omega') return;
-    var low = (mood === 'O') ? 0.04 : (mood === 'open') ? 0.03 : 0;
-    feat(ctx, P, 0, 0.455 + low, function () {
+  function drawBeard(ctx, P, mouth) {
+    if (!CLOSED_MOUTHS[mouth]) return;
+    feat(ctx, P, 0, 0.455, function () {
       ctx.fillStyle = INK;
       brush(ctx, [0, -0.035], [0.012, -0.0], [-0.012, 0.03], [0.006, 0.06], 0.05, 0.01, 0);
       brush(ctx, [-0.06, -0.04], [-0.07, -0.005], [-0.1, 0.02], [-0.13, 0.035], 0.045, 0.008, 0);
@@ -585,18 +932,18 @@
   // ---- 背中の飾り ----
   function drawBack(ctx, P, opts) {
     var txt = opts.backText || '福';
-    // 金の丸
     feat(ctx, P, 0, -0.08, function () {
-      ctx.lineWidth = 0.05; ctx.strokeStyle = '#f2c53d';
+      ctx.lineWidth = 0.05; ctx.strokeStyle = P.deco;
       ctx.beginPath(); ctx.arc(0, 0, 0.5, 0, TAU); ctx.stroke();
-      ctx.lineWidth = 0.018; ctx.strokeStyle = '#a8700c';
+      ctx.lineWidth = 0.018; ctx.strokeStyle = P.deco2;
       ctx.beginPath(); ctx.arc(0, 0, 0.44, 0, TAU); ctx.stroke();
       ctx.beginPath(); ctx.arc(0, 0, 0.56, 0, TAU); ctx.stroke();
       if (P.dir < 0) ctx.scale(-1, 1); // 左から回るときも字が裏返らないように
       ctx.font = 'bold ' + (txt.length > 1 ? 0.36 : 0.58) + 'px "Hiragino Mincho ProN","Yu Mincho","Noto Serif JP","Noto Serif CJK JP",serif';
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       var g = ctx.createLinearGradient(0, -0.35, 0, 0.35);
-      g.addColorStop(0, '#fff3b0'); g.addColorStop(0.5, '#f5c542'); g.addColorStop(1, '#c48a12');
+      if (P.deco === '#f2c53d') { g.addColorStop(0, '#fff3b0'); g.addColorStop(0.5, '#f5c542'); g.addColorStop(1, '#c48a12'); }
+      else { g.addColorStop(0, P.deco); g.addColorStop(1, P.deco2); }
       ctx.lineJoin = 'round';
       for (var i = 0; i < txt.length; i++) {
         var yy = txt.length > 1 ? (i - (txt.length - 1) / 2) * 0.37 : 0.02;
@@ -605,11 +952,10 @@
       }
     }, PI, 0.05);
   }
-  // 横の金のうず巻き(回るときの目印)
   function drawSideSwirls(ctx, P) {
     [-1, 1].forEach(function (s) {
       feat(ctx, P, 0, -0.05, function () {
-        ctx.strokeStyle = '#f2c53d'; ctx.lineWidth = 0.04; ctx.lineCap = 'round';
+        ctx.strokeStyle = P.deco; ctx.lineWidth = 0.04; ctx.lineCap = 'round';
         ctx.beginPath();
         for (var i = 0; i <= 40; i++) {
           var a = i / 40 * TAU * 1.6, rr = 0.03 + 0.15 * i / 40;
@@ -621,7 +967,6 @@
       }, s * PI * 0.56, 0.05);
     });
   }
-  // 下の金の帯と梅の花
   function drawBelly(ctx, P) {
     var R = P.R;
     function ring(v, lw, col) {
@@ -634,11 +979,12 @@
       }
       ctx.lineWidth = lw; ctx.strokeStyle = col; ctx.stroke();
     }
-    ring(0.57, R * 0.035, '#f2c53d');
-    ring(0.83, R * 0.035, '#f2c53d');
+    ring(0.57, R * 0.035, P.deco);
+    ring(0.83, R * 0.035, P.deco);
+    if (R < 26) return; // 小さいときは梅を省く(速さのため)
     for (var k = 0; k < 10; k++) {
       feat(ctx, P, 0, 0.70, function () {
-        ctx.fillStyle = '#f5c842';
+        ctx.fillStyle = P.deco;
         for (var i = 0; i < 5; i++) {
           var a = i / 5 * TAU - PI / 2;
           ctx.beginPath(); ctx.arc(Math.cos(a) * 0.055, Math.sin(a) * 0.055, 0.045, 0, TAU); ctx.fill();
@@ -650,9 +996,9 @@
       }, k / 10 * TAU + PI / 10, 0.08);
     }
   }
-  // 目かくしの布(豆しぼり)。頭をぐるっと一周する
-  function drawBlindfold(ctx, P, t) {
-    var R = P.R, v0 = EYE.v - 0.15, v1 = EYE.v + 0.13;
+  // 頭をぐるっと一周する布(目かくし・はちまき)
+  function drawBand(ctx, P, t, v0, v1, kind) {
+    var R = P.R;
     function edge(v, rev) {
       var r = rowR(v) * R, pts = [];
       for (var i = 0; i <= 30; i++) {
@@ -667,19 +1013,25 @@
     a.concat(b).forEach(function (p, i) { if (i) ctx.lineTo(p[0], p[1]); else ctx.moveTo(p[0], p[1]); });
     ctx.closePath();
     var g = ctx.createLinearGradient(0, v0 * R, 0, v1 * R + TILT * R);
-    g.addColorStop(0, '#3b4fa8'); g.addColorStop(0.5, '#2a3b8f'); g.addColorStop(1, '#1d2a6b');
+    var main = kind === 'hachimaki' ? '#fffaf0' : '#2a3b8f';
+    if (kind === 'hachimaki') { g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#e6dccb'); }
+    else { g.addColorStop(0, '#3b4fa8'); g.addColorStop(0.5, '#2a3b8f'); g.addColorStop(1, '#1d2a6b'); }
     ctx.fillStyle = g; ctx.fill();
     ctx.lineWidth = R * 0.03; ctx.strokeStyle = INK; ctx.stroke();
-    // 白い水玉(回る目印)
-    for (var k = 0; k < 14; k++) {
-      feat(ctx, P, 0, (v0 + v1) / 2 + (k % 2 ? 0.05 : -0.05), function () {
-        ctx.fillStyle = 'rgba(255,255,255,0.92)';
-        ctx.beginPath(); ctx.arc(0, 0, 0.035, 0, TAU); ctx.fill();
-      }, k / 14 * TAU, 0.05);
+    if (kind === 'hachimaki') {   // 前に赤い丸
+      feat(ctx, P, 0, (v0 + v1) / 2 + 0.01, function () {
+        ctx.fillStyle = '#e02020'; ctx.beginPath(); ctx.arc(0, 0, 0.075, 0, TAU); ctx.fill();
+      }, 0, 0.05);
+    } else {
+      for (var k = 0; k < 14; k++) {
+        feat(ctx, P, 0, (v0 + v1) / 2 + (k % 2 ? 0.05 : -0.05), function () {
+          ctx.fillStyle = 'rgba(255,255,255,0.92)';
+          ctx.beginPath(); ctx.arc(0, 0, 0.035, 0, TAU); ctx.fill();
+        }, k / 14 * TAU, 0.05);
+      }
     }
-    // 結び目(背中がわ)
-    feat(ctx, P, 0, (v0 + v1) / 2 + 0.02, function () {
-      ctx.fillStyle = '#2a3b8f'; ctx.strokeStyle = INK; ctx.lineWidth = 0.03;
+    feat(ctx, P, 0, (v0 + v1) / 2 + 0.02, function () {   // 結び目(背中がわ)
+      ctx.fillStyle = main; ctx.strokeStyle = INK; ctx.lineWidth = 0.03;
       var sw = Math.sin(t * 2.4) * 0.04;
       ctx.beginPath(); ctx.moveTo(-0.03, 0.02); ctx.quadraticCurveTo(-0.12, 0.3, -0.2 + sw, 0.5); ctx.lineTo(-0.1 + sw, 0.5);
       ctx.quadraticCurveTo(-0.03, 0.3, 0.02, 0.05); ctx.closePath(); ctx.fill(); ctx.stroke();
@@ -691,187 +1043,621 @@
     }, PI, 0.05);
   }
 
-  // ---- 顔まわりの動くもの(湯気・Zzz・音符…) 頭の中心が原点、単位は px ----
-  function drawExtras(ctx, R, mood, t, faceC) {
-    var i, p, x, y;
-    ctx.save();
-    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-    if (mood === 'angry' || mood === 'furious') {
-      // 湯気(げきおこは 2倍・速い)
-      var nSteam = mood === 'furious' ? 8 : 4;
-      for (i = 0; i < nSteam; i++) {
-        var s = i % 2 ? 1 : -1;
-        p = fract(t * (mood === 'furious' ? 1.6 : 0.9) + i / nSteam);
-        x = s * (R * 0.42 + p * R * 0.3); y = -R * 0.88 - p * R * 0.65;
-        var pr = R * (0.09 + p * 0.1);
-        ctx.globalAlpha = (1 - p) * 0.9;
-        ctx.fillStyle = '#ffffff'; ctx.strokeStyle = 'rgba(120,120,140,0.6)'; ctx.lineWidth = R * 0.02;
-        ctx.beginPath();
-        ctx.arc(x, y, pr, 0, TAU); ctx.arc(x + pr * 0.8, y + pr * 0.2, pr * 0.7, 0, TAU); ctx.arc(x - pr * 0.75, y + pr * 0.25, pr * 0.65, 0, TAU);
-        ctx.fill();
-      }
-      ctx.globalAlpha = 1;
-      // 怒りマーク
-      var sc = R * (0.24 + 0.03 * Math.sin(t * 12));
-      ctx.save(); ctx.translate(R * 0.58, -R * 0.72);
-      for (var q = 0; q < 2; q++) {
-        ctx.lineWidth = q ? sc * 0.17 : sc * 0.36;
-        ctx.strokeStyle = q ? '#e01b24' : '#ffffff';
-        for (i = 0; i < 4; i++) {
-          ctx.save(); ctx.rotate(i * PI / 2);
-          ctx.beginPath(); ctx.moveTo(sc * 0.12, -sc * 0.55); ctx.quadraticCurveTo(sc * 0.14, -sc * 0.14, sc * 0.55, -sc * 0.12); ctx.stroke();
-          ctx.restore();
-        }
-      }
-      ctx.restore();
-    }
-    if (mood === 'sleepy') {
-      for (i = 0; i < 3; i++) {
-        p = fract(t * 0.35 + i / 3);
-        ctx.globalAlpha = p < 0.15 ? p / 0.15 : (1 - p);
-        outlinedText(ctx, 'Z', R * (0.55 + p * 0.45), -R * (0.75 + p * 0.6), Math.round(R * (0.18 + p * 0.18)), '#cfe3ff', '#2b3a66');
-      }
-      ctx.globalAlpha = 1;
-    }
-    if (mood === 'happy' || mood === 'laugh') {
-      for (i = 0; i < 2; i++) {
-        p = fract(t * 0.5 + i * 0.5);
-        x = (i ? -1 : 1) * R * (0.8 + Math.sin(p * 6) * 0.06); y = -R * (0.45 + p * 0.65);
-        ctx.globalAlpha = Math.min(1, (1 - p) * 2);
-        ctx.fillStyle = i ? '#ff7ab0' : '#ffd23f'; ctx.strokeStyle = INK; ctx.lineWidth = R * 0.02;
-        var ns = R * 0.11;
-        ctx.save(); ctx.translate(x, y); ctx.rotate(-0.25);
-        ctx.beginPath(); ctx.ellipse(0, 0, ns * 0.75, ns * 0.55, -0.4, 0, TAU); ctx.fill(); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(ns * 0.6, -ns * 0.1); ctx.lineTo(ns * 0.6, -ns * 1.9); ctx.quadraticCurveTo(ns * 1.3, -ns * 1.5, ns * 1.2, -ns * 0.9); ctx.stroke();
+  // ---- まわりの動くもの ----
+  function puff(ctx, x, y, pr) {
+    ctx.beginPath();
+    ctx.arc(x, y, pr, 0, TAU); ctx.arc(x + pr * 0.8, y + pr * 0.2, pr * 0.7, 0, TAU); ctx.arc(x - pr * 0.75, y + pr * 0.25, pr * 0.65, 0, TAU);
+    ctx.fill();
+  }
+  function angerMark(ctx, x, y, sc) {
+    ctx.save(); ctx.translate(x, y);
+    for (var q = 0; q < 2; q++) {
+      ctx.lineWidth = q ? sc * 0.17 : sc * 0.36;
+      ctx.strokeStyle = q ? '#e01b24' : '#ffffff';
+      for (var i = 0; i < 4; i++) {
+        ctx.save(); ctx.rotate(i * PI / 2);
+        ctx.beginPath(); ctx.moveTo(sc * 0.12, -sc * 0.55); ctx.quadraticCurveTo(sc * 0.14, -sc * 0.14, sc * 0.55, -sc * 0.12); ctx.stroke();
         ctx.restore();
       }
+    }
+    ctx.restore();
+  }
+  function sweatDrop(ctx, x, y, s, R) {
+    ctx.fillStyle = '#8fd3ff'; ctx.strokeStyle = '#2a6aa8'; ctx.lineWidth = Math.max(1, R * 0.02);
+    drop(ctx, x, y, s); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(x - s * 0.2, y + s * 0.2, s * 0.18, 0, TAU); ctx.fill();
+  }
+  function flower(ctx, x, y, s, col, rot) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(rot || 0);
+    ctx.fillStyle = col; ctx.strokeStyle = INK; ctx.lineWidth = Math.max(1, s * 0.12);
+    for (var i = 0; i < 5; i++) { var a = i / 5 * TAU; ctx.beginPath(); ctx.ellipse(Math.cos(a) * s * 0.55, Math.sin(a) * s * 0.55, s * 0.42, s * 0.32, a, 0, TAU); ctx.fill(); ctx.stroke(); }
+    ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(0, 0, s * 0.3, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+  // 後ろ(体より先に描く)
+  function drawFxBack(ctx, R, S, t) {
+    var i, a;
+    ctx.save();
+    if (has(S.fx, 'flames')) {
+      for (i = 0; i < 11; i++) {
+        a = PI + PI * (i + 0.5) / 11 - 0.25 + 0.5 * i / 11;
+        var bx = Math.cos(a) * R * 0.8, by = Math.sin(a) * R * 0.85 - R * 0.05;
+        var len = R * (0.45 + 0.18 * Math.sin(t * 11 + i * 1.7));
+        var tx = bx + Math.cos(a) * len, ty = by + Math.sin(a) * len - R * 0.15;
+        var fg = ctx.createLinearGradient(bx, by, tx, ty);
+        fg.addColorStop(0, '#ff4a12'); fg.addColorStop(0.6, '#ff9a1f'); fg.addColorStop(1, '#ffe14a');
+        ctx.fillStyle = fg;
+        var nx = -Math.sin(a) * R * 0.2, ny = Math.cos(a) * R * 0.2;
+        ctx.beginPath(); ctx.moveTo(bx + nx, by + ny); ctx.quadraticCurveTo(bx + nx * 0.6 + (tx - bx) * 0.6, by + ny * 0.6 + (ty - by) * 0.6, tx, ty);
+        ctx.quadraticCurveTo(bx - nx * 0.6 + (tx - bx) * 0.6, by - ny * 0.6 + (ty - by) * 0.6, bx - nx, by - ny); ctx.closePath(); ctx.fill();
+      }
+    }
+    if (has(S.fx, 'halo')) {   // 後光
+      var hg = ctx.createRadialGradient(0, -R * 0.1, R * 0.6, 0, -R * 0.1, R * 1.4);
+      hg.addColorStop(0, 'rgba(255,230,140,0.95)'); hg.addColorStop(0.6, 'rgba(255,210,90,0.5)'); hg.addColorStop(1, 'rgba(255,210,90,0)');
+      ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(0, -R * 0.1, R * 1.4, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#f2b91e'; ctx.lineWidth = R * 0.06; ctx.beginPath(); ctx.arc(0, -R * 0.1, R * 1.15, 0, TAU); ctx.stroke();
+      ctx.lineWidth = R * 0.02;
+      for (i = 0; i < 24; i++) { a = i / 24 * TAU + t * 0.2; ctx.beginPath(); ctx.moveTo(Math.cos(a) * R * 1.18, -R * 0.1 + Math.sin(a) * R * 1.18); ctx.lineTo(Math.cos(a) * R * 1.35, -R * 0.1 + Math.sin(a) * R * 1.35); ctx.stroke(); }
+    }
+    if (has(S.fx, 'aura') || has(S.fx, 'auraRainbow')) {
+      var rb = has(S.fx, 'auraRainbow');
+      for (i = 0; i < 16; i++) {
+        a = i / 16 * TAU + t * 0.5;
+        ctx.fillStyle = rb ? 'hsla(' + ((i * 45 + t * 120) % 360) + ',90%,60%,0.8)' : (i % 2 ? 'rgba(255,220,90,0.75)' : 'rgba(255,250,200,0.55)');
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, R * 1.42, a, a + TAU / 32); ctx.closePath(); ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+  // 前(体のあとに描く)。頭の中心が原点、単位は px
+  function drawFxTop(ctx, R, S, t, faceC, dir) {
+    var fx = S.fx, i, p, x, y, a;
+    ctx.save();
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    var lw = Math.max(1, R * 0.02);
+    function steamPuffs(n, sc, sp) {
+      for (i = 0; i < n; i++) {
+        var s = i % 2 ? 1 : -1;
+        p = fract(t * sp + i / n);
+        x = s * (R * 0.42 + p * R * 0.3 * sc); y = -R * 0.88 - p * R * 0.6;
+        ctx.globalAlpha = (1 - p) * 0.9;
+        ctx.fillStyle = '#ffffff';
+        puff(ctx, x, y, R * (0.09 + p * 0.1) * sc);
+      }
       ctx.globalAlpha = 1;
     }
-    if (mood === 'dizzy') {
-      for (i = 0; i < 3; i++) {
-        var a = t * 3 + i * TAU / 3;
-        x = Math.cos(a) * R * 0.62; y = -R * 1.02 + Math.sin(a) * R * 0.14;
-        ctx.fillStyle = '#ffd93b'; ctx.strokeStyle = INK; ctx.lineWidth = R * 0.022;
-        star(ctx, x, y, R * (0.1 + 0.02 * Math.sin(a)), 5, 0.48, a * 0.5); ctx.fill(); ctx.stroke();
+    fx.forEach(function (name) {
+      if (name.indexOf('text:') === 0) {
+        var str = name.slice(5), fs = Math.round(R * (str.length > 3 ? 0.24 : 0.3));
+        ctx.save(); ctx.translate(R * 0.82, -R * 0.98 + Math.sin(t * 3) * R * 0.03); ctx.rotate(-0.12);
+        outlinedText(ctx, str, 0, 0, Math.max(6, fs), '#ffffff', INK);
+        ctx.restore();
+        return;
+      }
+      switch (name) {
+        case 'steam': steamPuffs(4, 1, 0.9); break;
+        case 'steamBig': steamPuffs(8, 1.5, 1.4); break;
+        case 'vein': angerMark(ctx, R * 0.58, -R * 0.72, R * (0.24 + 0.03 * Math.sin(t * 12))); break;
+        case 'veinMany':
+          angerMark(ctx, R * 0.6, -R * 0.7, R * (0.26 + 0.04 * Math.sin(t * 12)));
+          angerMark(ctx, -R * 0.62, -R * 0.6, R * (0.2 + 0.04 * Math.sin(t * 12 + 1)));
+          angerMark(ctx, R * 0.05, -R * 1.02, R * (0.18 + 0.04 * Math.sin(t * 12 + 2)));
+          break;
+        case 'zzz':
+          for (i = 0; i < 3; i++) {
+            p = fract(t * 0.35 + i / 3);
+            ctx.globalAlpha = p < 0.15 ? p / 0.15 : (1 - p);
+            outlinedText(ctx, 'Z', R * (0.55 + p * 0.45), -R * (0.75 + p * 0.6), Math.max(5, Math.round(R * (0.18 + p * 0.18))), '#cfe3ff', '#2b3a66');
+          }
+          ctx.globalAlpha = 1;
+          break;
+        case 'notes':
+          for (i = 0; i < 2; i++) {
+            p = fract(t * 0.5 + i * 0.5);
+            x = (i ? -1 : 1) * R * (0.8 + Math.sin(p * 6) * 0.06); y = -R * (0.45 + p * 0.65);
+            ctx.globalAlpha = Math.min(1, (1 - p) * 2);
+            ctx.fillStyle = i ? '#ff7ab0' : '#ffd23f'; ctx.strokeStyle = INK; ctx.lineWidth = lw;
+            var ns = R * 0.11;
+            ctx.save(); ctx.translate(x, y); ctx.rotate(-0.25);
+            ctx.beginPath(); ctx.ellipse(0, 0, ns * 0.75, ns * 0.55, -0.4, 0, TAU); ctx.fill(); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(ns * 0.6, -ns * 0.1); ctx.lineTo(ns * 0.6, -ns * 1.9); ctx.quadraticCurveTo(ns * 1.3, -ns * 1.5, ns * 1.2, -ns * 0.9); ctx.stroke();
+            ctx.restore();
+          }
+          ctx.globalAlpha = 1;
+          break;
+        case 'stars':
+          for (i = 0; i < 3; i++) {
+            a = t * 3 + i * TAU / 3;
+            ctx.fillStyle = '#ffd93b'; ctx.strokeStyle = INK; ctx.lineWidth = lw;
+            star(ctx, Math.cos(a) * R * 0.62, -R * 1.02 + Math.sin(a) * R * 0.14, R * (0.1 + 0.02 * Math.sin(a)), 5, 0.48, a * 0.5); ctx.fill(); ctx.stroke();
+          }
+          break;
+        case 'birds':
+          ctx.strokeStyle = INK; ctx.lineWidth = Math.max(1.2, R * 0.035);
+          for (i = 0; i < 3; i++) {
+            a = t * 1.5 + i * TAU / 3;
+            x = Math.cos(a) * R * 0.7; y = -R * 1.08 + Math.sin(a) * R * 0.12;
+            var fl = Math.sin(t * 12 + i) * R * 0.04;
+            ctx.beginPath(); ctx.moveTo(x - R * 0.1, y - fl); ctx.quadraticCurveTo(x - R * 0.04, y - R * 0.05, x, y); ctx.quadraticCurveTo(x + R * 0.04, y - R * 0.05, x + R * 0.1, y - fl); ctx.stroke();
+          }
+          break;
+        case 'sparkle': case 'sparkleBig': {
+          var big = name === 'sparkleBig';
+          var pos = big ? [[0.86, -0.72], [-0.92, -0.5], [0.95, 0.05], [-0.7, -1.0], [0.35, -1.12], [-1.0, 0.25]] : [[0.86, -0.72], [-0.92, -0.5], [0.95, 0.05]];
+          for (i = 0; i < pos.length; i++) {
+            var k = 0.5 + 0.5 * Math.sin(t * 4 + i * 1.6);
+            sparkle(ctx, pos[i][0] * R, pos[i][1] * R, R * (big ? 0.09 + 0.12 * k : 0.06 + 0.09 * k), big ? ['#fff3a0', '#ffffff', '#ffd0f0'][i % 3] : '#fff3a0');
+          }
+          break;
+        }
+        case 'star1':
+          ctx.fillStyle = '#ffd23f'; ctx.strokeStyle = INK; ctx.lineWidth = lw;
+          star(ctx, R * 0.82, -R * 0.42, R * (0.13 + 0.02 * Math.sin(t * 6)), 5, 0.48, t); ctx.fill(); ctx.stroke();
+          break;
+        case 'hearts':
+          for (i = 0; i < 2; i++) {
+            p = fract(t * 0.45 + i * 0.5);
+            ctx.globalAlpha = Math.min(1, (1 - p) * 1.6);
+            ctx.fillStyle = '#ff6fa3'; ctx.strokeStyle = INK; ctx.lineWidth = lw;
+            heart(ctx, (i ? -0.85 : 0.9) * R + Math.sin(p * 7) * R * 0.05, -R * (0.4 + p * 0.7), R * 0.13);
+            ctx.fill(); ctx.stroke();
+          }
+          ctx.globalAlpha = 1;
+          break;
+        case 'excl':
+          outlinedText(ctx, '!', R * 0.8, -R * 0.92 - Math.abs(Math.sin(t * 9)) * R * 0.05, Math.max(6, Math.round(R * 0.5)), '#ffe14d', INK);
+          break;
+        case 'excl2':
+          outlinedText(ctx, '!!', R * 0.78, -R * 0.92 - Math.abs(Math.sin(t * 12)) * R * 0.06, Math.max(6, Math.round(R * 0.5)), '#ff4a3a', INK);
+          break;
+        case 'shock':
+          ctx.strokeStyle = INK; ctx.lineWidth = Math.max(1.2, R * 0.035);
+          for (i = -1; i <= 1; i++) {
+            a = -PI / 2 + i * 0.45 - 0.75;
+            ctx.beginPath(); ctx.moveTo(Math.cos(a) * R * 1.08, Math.sin(a) * R * 1.08); ctx.lineTo(Math.cos(a) * R * 1.3, Math.sin(a) * R * 1.3); ctx.stroke();
+          }
+          break;
+        case 'question': {
+          var bob = Math.sin(t * 2.5) * R * 0.05;
+          outlinedText(ctx, '?', R * 0.82, -R * 0.85 + bob, Math.max(6, Math.round(R * 0.38)), '#ffffff', INK);
+          outlinedText(ctx, '?', -R * 0.86, -R * 0.62 - bob, Math.max(5, Math.round(R * 0.26)), '#ffffff', INK);
+          break;
+        }
+        case 'q1':
+          ctx.save(); ctx.translate(R * 0.8, -R * 0.9); ctx.rotate(Math.sin(t * 2) * 0.15);
+          outlinedText(ctx, '?', 0, 0, Math.max(6, Math.round(R * 0.5)), '#7fd3ff', INK); ctx.restore();
+          break;
+        case 'dots':
+          for (i = 0; i < 3; i++) {
+            if (fract(t * 0.8) * 4 <= i) continue;
+            ctx.fillStyle = INK;
+            ctx.beginPath(); ctx.arc(R * (0.62 + i * 0.16), -R * 0.92, Math.max(1, R * 0.045), 0, TAU); ctx.fill();
+          }
+          break;
+        case 'sweat':
+          if (faceC > 0.3) { p = fract(t * 0.6); ctx.globalAlpha = p < 0.8 ? 1 : (1 - p) * 5; sweatDrop(ctx, -R * 0.78, -R * 0.45 + p * R * 0.18, R * 0.1, R); ctx.globalAlpha = 1; }
+          break;
+        case 'sweatBig':
+          sweatDrop(ctx, R * 0.74, -R * 0.5 + Math.sin(t * 2) * R * 0.03, R * 0.2, R);
+          break;
+        case 'sweatMany':
+          for (i = 0; i < 4; i++) {
+            p = fract(t * 1.2 + i / 4);
+            a = [-2.4, -0.7, -2.0, -1.1][i];
+            ctx.globalAlpha = 1 - p;
+            sweatDrop(ctx, Math.cos(a) * R * (0.95 + p * 0.3), Math.sin(a) * R * (0.85 + p * 0.3), R * 0.09, R);
+          }
+          ctx.globalAlpha = 1;
+          break;
+        case 'snow':
+          ctx.strokeStyle = '#ffffff'; ctx.lineWidth = Math.max(1, R * 0.025);
+          for (i = 0; i < 7; i++) {
+            p = fract(t * 0.25 + i / 7);
+            x = (-1.1 + (i * 0.37 % 2.2)) * R + Math.sin(t * 2 + i) * R * 0.08; y = -R * 1.25 + p * R * 2.1;
+            var ss = R * 0.07;
+            ctx.beginPath();
+            for (var q = 0; q < 3; q++) { var qa = q * PI / 3; ctx.moveTo(x - Math.cos(qa) * ss, y - Math.sin(qa) * ss); ctx.lineTo(x + Math.cos(qa) * ss, y + Math.sin(qa) * ss); }
+            ctx.stroke();
+          }
+          break;
+        case 'wind':
+          ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = Math.max(1.2, R * 0.035);
+          for (i = 0; i < 3; i++) {
+            p = fract(t * 0.6 + i / 3);
+            x = (-1.4 + p * 2.8) * R; y = (-0.6 + i * 0.45) * R;
+            ctx.globalAlpha = Math.sin(p * PI);
+            ctx.beginPath(); ctx.moveTo(x - R * 0.4, y); ctx.quadraticCurveTo(x, y - R * 0.08, x + R * 0.2, y); ctx.arc(x + R * 0.2, y - R * 0.08, R * 0.08, PI / 2, -PI, true); ctx.stroke();
+          }
+          ctx.globalAlpha = 1;
+          break;
+        case 'flowers': {
+          var fp = [[-1.0, 0.6, '#ff8fc0'], [1.0, 0.5, '#ffd23f'], [-0.95, -0.5, '#ffd23f'], [0.95, -0.7, '#ff8fc0'], [0.05, -1.18, '#ffb0d0']];
+          for (i = 0; i < fp.length; i++) flower(ctx, fp[i][0] * R, fp[i][1] * R, R * 0.13, fp[i][2], t * 0.6 + i);
+          break;
+        }
+        case 'gloom':
+          ctx.fillStyle = '#5a5470'; puff(ctx, 0, -R * 1.15, R * 0.22); puff(ctx, -R * 0.3, -R * 1.1, R * 0.16); puff(ctx, R * 0.3, -R * 1.1, R * 0.16);
+          ctx.strokeStyle = 'rgba(120,150,220,0.9)'; ctx.lineWidth = Math.max(1, R * 0.025);
+          for (i = 0; i < 4; i++) { p = fract(t * 1.2 + i / 4); x = (-0.35 + i * 0.23) * R; y = -R * 1.0 + p * R * 0.3; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - R * 0.03, y + R * 0.1); ctx.stroke(); }
+          break;
+        case 'lightning':
+          ctx.fillStyle = '#ffe14d'; ctx.strokeStyle = INK; ctx.lineWidth = lw;
+          ctx.save(); ctx.translate(R * 0.78, -R * 0.95); ctx.scale(R / 50, R / 50);
+          ctx.beginPath(); ctx.moveTo(4, -22); ctx.lineTo(-10, 4); ctx.lineTo(0, 4); ctx.lineTo(-6, 26); ctx.lineTo(12, -4); ctx.lineTo(2, -4); ctx.lineTo(10, -22); ctx.closePath();
+          ctx.restore(); ctx.fill(); ctx.stroke();
+          break;
+        case 'ghost': {   // たましいが ぬけていく
+          p = fract(t * 0.35);
+          x = R * (0.1 + p * 0.6); y = R * (0.15 - p * 1.1);
+          ctx.globalAlpha = 0.9 * Math.min(1, (1 - p) * 2.5);
+          ctx.fillStyle = '#ffffff'; ctx.strokeStyle = '#7a8aa8'; ctx.lineWidth = lw;
+          var gs = R * 0.22;
+          ctx.beginPath(); ctx.arc(x, y, gs, PI, 0); ctx.quadraticCurveTo(x + gs, y + gs * 1.2, x + gs * 0.2, y + gs * 1.6); ctx.quadraticCurveTo(x - gs * 0.6, y + gs * 1.2, x - gs, y); ctx.closePath(); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = INK; ctx.beginPath(); ctx.arc(x - gs * 0.35, y, gs * 0.12, 0, TAU); ctx.arc(x + gs * 0.3, y, gs * 0.12, 0, TAU); ctx.fill();
+          ctx.globalAlpha = 1;
+          break;
+        }
+        case 'table': {   // ちゃぶ台が とんでいく
+          ctx.save(); ctx.translate(R * 0.85, -R * 1.0); ctx.rotate(-0.6 + Math.sin(t * 5) * 0.25);
+          ctx.fillStyle = '#7a4a26'; ctx.strokeStyle = INK; ctx.lineWidth = lw;
+          ctx.fillRect(-R * 0.25, R * 0.04, R * 0.06, R * 0.18); ctx.strokeRect(-R * 0.25, R * 0.04, R * 0.06, R * 0.18);
+          ctx.fillRect(R * 0.19, R * 0.04, R * 0.06, R * 0.18); ctx.strokeRect(R * 0.19, R * 0.04, R * 0.06, R * 0.18);
+          ctx.fillStyle = '#a8683a'; ctx.beginPath(); ctx.ellipse(0, 0, R * 0.36, R * 0.1, 0, 0, TAU); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.ellipse(-R * 0.08, -R * 0.06, R * 0.06, R * 0.04, 0, 0, TAU); ctx.fill(); ctx.stroke();
+          ctx.restore();
+          break;
+        }
+        case 'bump': {    // たんこぶ
+          ctx.fillStyle = '#ff6a5a'; ctx.strokeStyle = INK; ctx.lineWidth = Math.max(1.5, R * 0.04);
+          ctx.beginPath(); ctx.arc(R * 0.18, -R * 1.0, R * 0.2, PI * 0.95, PI * 2.05); ctx.fill(); ctx.stroke();
+          ctx.beginPath(); ctx.arc(R * 0.18, -R * 1.16, R * 0.12, PI * 0.95, PI * 2.05); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.beginPath(); ctx.arc(R * 0.13, -R * 1.2, R * 0.03, 0, TAU); ctx.fill();
+          break;
+        }
+        case 'pain':
+          ctx.fillStyle = '#ffe14d'; ctx.strokeStyle = INK; ctx.lineWidth = lw;
+          for (i = 0; i < 2; i++) { star(ctx, (i ? -0.55 : 0.6) * R, -R * (1.05 - i * 0.1), R * 0.09, 4, 0.4, t * 3); ctx.fill(); ctx.stroke(); }
+          break;
+        case 'confetti': {
+          var cols = ['#ff4a6a', '#ffd23f', '#3cc8ff', '#7ce06a', '#c38bff'];
+          for (i = 0; i < 14; i++) {
+            p = fract(t * 0.4 + i * 0.137);
+            x = (-1.2 + (i * 0.53 % 2.4)) * R + Math.sin(t * 3 + i) * R * 0.1; y = -R * 1.35 + p * R * 2.4;
+            ctx.save(); ctx.translate(x, y); ctx.rotate(t * 4 + i);
+            ctx.fillStyle = cols[i % cols.length]; ctx.fillRect(-R * 0.05, -R * 0.025, R * 0.1, R * 0.05);
+            ctx.restore();
+          }
+          break;
+        }
+        case 'crow': {    // カラスが とんでいく(しーん…)
+          x = (fract(t * 0.18) * 2.8 - 1.4) * R; y = -R * 1.12;
+          var wf = Math.sin(t * 10) * R * 0.08;
+          ctx.fillStyle = '#1a1a22';
+          ctx.beginPath(); ctx.ellipse(x, y, R * 0.12, R * 0.06, 0, 0, TAU); ctx.fill();
+          ctx.beginPath(); ctx.moveTo(x - R * 0.05, y); ctx.lineTo(x - R * 0.2, y - R * 0.05 - wf); ctx.lineTo(x + R * 0.02, y - R * 0.02); ctx.fill();
+          ctx.beginPath(); ctx.moveTo(x + R * 0.0, y); ctx.lineTo(x + R * 0.18, y - R * 0.04 - wf); ctx.lineTo(x + R * 0.06, y - R * 0.01); ctx.fill();
+          ctx.beginPath(); ctx.moveTo(x + R * 0.12, y - R * 0.01); ctx.lineTo(x + R * 0.18, y + R * 0.01); ctx.lineTo(x + R * 0.11, y + R * 0.03); ctx.fill();
+          break;
+        }
+        case 'zabuton': { // ざぶとん1まい!
+          ctx.save(); ctx.translate(0, -R * 1.18 + Math.sin(t * 2) * R * 0.03);
+          ctx.fillStyle = '#8a3fb8'; ctx.strokeStyle = INK; ctx.lineWidth = lw;
+          ctx.beginPath(); ctx.moveTo(-R * 0.5, 0); ctx.quadraticCurveTo(0, -R * 0.08, R * 0.5, 0); ctx.quadraticCurveTo(R * 0.58, R * 0.1, R * 0.45, R * 0.2);
+          ctx.quadraticCurveTo(0, R * 0.26, -R * 0.45, R * 0.2); ctx.quadraticCurveTo(-R * 0.58, R * 0.1, -R * 0.5, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = '#f2c53d';
+          [[-0.5, 0.0], [0.5, 0.0], [-0.46, 0.2], [0.46, 0.2]].forEach(function (c) { ctx.beginPath(); ctx.arc(c[0] * R, c[1] * R, R * 0.04, 0, TAU); ctx.fill(); });
+          ctx.restore();
+          break;
+        }
+        case 'sigh':
+          p = fract(t * 0.5);
+          ctx.globalAlpha = 0.85 * (1 - p); ctx.fillStyle = '#ffffff';
+          puff(ctx, R * (0.45 + p * 0.45), R * (0.32 + p * 0.1), R * (0.08 + p * 0.1));
+          ctx.globalAlpha = 1;
+          break;
+        case 'think': case 'riceball': {
+          ctx.fillStyle = '#ffffff'; ctx.strokeStyle = INK; ctx.lineWidth = lw;
+          ctx.beginPath(); ctx.arc(R * 0.55, -R * 0.78, R * 0.05, 0, TAU); ctx.fill(); ctx.stroke();
+          ctx.beginPath(); ctx.arc(R * 0.66, -R * 0.92, R * 0.07, 0, TAU); ctx.fill(); ctx.stroke();
+          ctx.beginPath(); ctx.ellipse(R * 0.88, -R * 1.15, R * 0.3, R * 0.22, 0, 0, TAU); ctx.fill(); ctx.stroke();
+          if (name === 'think') outlinedText(ctx, '?', R * 0.88, -R * 1.15, Math.max(5, Math.round(R * 0.28)), '#ffd23f', INK);
+          else {
+            ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.moveTo(R * 0.88, -R * 1.3); ctx.quadraticCurveTo(R * 1.08, -R * 1.02, R * 1.02, -R * 1.02);
+            ctx.lineTo(R * 0.74, -R * 1.02); ctx.quadraticCurveTo(R * 0.68, -R * 1.02, R * 0.88, -R * 1.3); ctx.closePath(); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = '#1d3a2a'; ctx.fillRect(R * 0.8, -R * 1.11, R * 0.16, R * 0.09);
+          }
+          break;
+        }
+        case 'wiggle':
+          ctx.strokeStyle = INK; ctx.lineWidth = Math.max(1.2, R * 0.035);
+          for (i = 0; i < 2; i++) {
+            var on = (Math.floor(t * 8) + i) % 2;
+            if (!on) continue;
+            [-1, 1].forEach(function (s) { ctx.beginPath(); ctx.arc(0, -R * 0.1, R * (1.08 + i * 0.14), s > 0 ? -0.5 : PI - 0.5 + 1, s > 0 ? 0.5 : PI + 0.5 + 1 - 1); ctx.stroke(); });
+          }
+          break;
+        case 'feather':
+          ctx.save(); ctx.translate(R * 0.95, R * 0.15); ctx.rotate(-0.9 + Math.sin(t * 10) * 0.3);
+          ctx.fillStyle = '#ffffff'; ctx.strokeStyle = INK; ctx.lineWidth = lw;
+          ctx.beginPath(); ctx.moveTo(0, -R * 0.4); ctx.bezierCurveTo(R * 0.2, -R * 0.25, R * 0.15, R * 0.15, 0, R * 0.28); ctx.bezierCurveTo(-R * 0.15, R * 0.15, -R * 0.2, -R * 0.25, 0, -R * 0.4); ctx.fill(); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(0, -R * 0.35); ctx.lineTo(0, R * 0.42); ctx.stroke();
+          ctx.restore();
+          break;
+        case 'whiteFlag':
+          ctx.strokeStyle = '#8a5a2c'; ctx.lineWidth = Math.max(1.5, R * 0.04);
+          ctx.beginPath(); ctx.moveTo(R * 0.9, R * 0.45); ctx.lineTo(R * 0.95, -R * 0.75); ctx.stroke();
+          var fw = Math.sin(t * 6) * R * 0.05;
+          ctx.fillStyle = '#ffffff'; ctx.strokeStyle = INK; ctx.lineWidth = lw;
+          ctx.beginPath(); ctx.moveTo(R * 0.95, -R * 0.75); ctx.quadraticCurveTo(R * 1.15, -R * 0.8 + fw, R * 1.32, -R * 0.72); ctx.lineTo(R * 1.3, -R * 0.42);
+          ctx.quadraticCurveTo(R * 1.12, -R * 0.5 - fw, R * 0.94, -R * 0.45); ctx.closePath(); ctx.fill(); ctx.stroke();
+          break;
+        case 'futon': {   // ふとんが ふっとんだ
+          ctx.save(); ctx.translate(R * 0.8 + Math.sin(t * 3) * R * 0.08, -R * 1.05); ctx.rotate(0.3 + Math.sin(t * 4) * 0.2);
+          ctx.fillStyle = '#ff9ab8'; ctx.strokeStyle = INK; ctx.lineWidth = lw;
+          rrect(ctx, -R * 0.35, -R * 0.18, R * 0.7, R * 0.36, R * 0.08); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = '#ffffff';
+          for (i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(-R * 0.18 + i * R * 0.18, (i % 2 ? 0.06 : -0.05) * R, R * 0.05, 0, TAU); ctx.fill(); }
+          ctx.restore();
+          ctx.strokeStyle = INK; ctx.lineWidth = lw;
+          for (i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(R * 0.3, -R * (0.85 + i * 0.12)); ctx.lineTo(R * 0.4, -R * (0.9 + i * 0.12)); ctx.stroke(); }
+          break;
+        }
+        case 'butterfly': {
+          x = R * (0.85 + Math.sin(t * 1.3) * 0.15); y = -R * (0.85 + Math.cos(t * 1.7) * 0.15);
+          var wg = Math.abs(Math.sin(t * 12));
+          ctx.fillStyle = '#ffd23f'; ctx.strokeStyle = INK; ctx.lineWidth = Math.max(1, R * 0.015);
+          [-1, 1].forEach(function (s) { ctx.beginPath(); ctx.ellipse(x + s * R * 0.07 * wg, y, R * 0.08 * wg + R * 0.01, R * 0.1, s * 0.3, 0, TAU); ctx.fill(); ctx.stroke(); });
+          ctx.fillStyle = INK; ctx.fillRect(x - R * 0.01, y - R * 0.07, R * 0.02, R * 0.14);
+          break;
+        }
+        case 'onsen':     // ♨ のゆげ
+          ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.lineWidth = Math.max(1.5, R * 0.045);
+          for (i = -1; i <= 1; i++) {
+            ctx.beginPath();
+            for (var q2 = 0; q2 <= 10; q2++) { var oy = -R * 1.1 - q2 * R * 0.04, ox = i * R * 0.22 + Math.sin(q2 * 0.9 + t * 4 + i) * R * 0.05; if (q2) ctx.lineTo(ox, oy); else ctx.moveTo(ox, oy); }
+            ctx.stroke();
+          }
+          break;
+        case 'lemon':
+          ctx.save(); ctx.translate(R * 0.88, -R * 0.78); ctx.rotate(Math.sin(t * 2) * 0.2);
+          ctx.fillStyle = '#ffe14a'; ctx.strokeStyle = INK; ctx.lineWidth = lw;
+          ctx.beginPath(); ctx.arc(0, 0, R * 0.2, 0, TAU); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = '#fff8c0'; ctx.beginPath(); ctx.arc(0, 0, R * 0.15, 0, TAU); ctx.fill();
+          ctx.strokeStyle = '#e6b800';
+          for (i = 0; i < 6; i++) { a = i / 6 * TAU; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(a) * R * 0.15, Math.sin(a) * R * 0.15); ctx.stroke(); }
+          ctx.restore();
+          break;
+        case 'dododo':    // ゴゴゴ…
+          for (i = 0; i < 3; i++) {
+            var jx = Math.sin(t * 30 + i) * R * 0.02;
+            outlinedText(ctx, 'ゴ', -R * 1.05 + jx, -R * (0.75 - i * 0.4), Math.max(5, Math.round(R * 0.3)), '#7a3cc8', '#ffffff');
+            outlinedText(ctx, 'ゴ', R * 1.05 - jx, -R * (0.95 - i * 0.4), Math.max(5, Math.round(R * 0.3)), '#7a3cc8', '#ffffff');
+          }
+          break;
+        case 'smoke':
+          for (i = 0; i < 6; i++) {
+            p = fract(t * 0.3 + i / 6);
+            a = PI + i / 5 * PI;
+            ctx.globalAlpha = 0.75 * (1 - p); ctx.fillStyle = '#8a8a90';
+            puff(ctx, Math.cos(a) * R * (0.9 + p * 0.3), Math.sin(a) * R * 0.8 - p * R * 0.4, R * (0.1 + p * 0.08));
+          }
+          ctx.globalAlpha = 1;
+          break;
+        case 'twitch':
+          if (Math.sin(t * 9) > -0.3) {
+            ctx.strokeStyle = '#e01b24'; ctx.lineWidth = Math.max(1.2, R * 0.035);
+            for (i = -1; i <= 1; i++) { a = -0.7 + i * 0.35; ctx.beginPath(); ctx.moveTo(R * 0.72 + Math.cos(a) * R * 0.1, -R * 0.62 + Math.sin(a) * R * 0.1); ctx.lineTo(R * 0.72 + Math.cos(a) * R * 0.22, -R * 0.62 + Math.sin(a) * R * 0.22); ctx.stroke(); }
+          }
+          break;
+      }
+    });
+    ctx.restore();
+  }
+
+  // 顔に付いて動くもの(なみだ・鼻水・つらら・つば)
+  function drawFaceFx(ctx, P, S, t) {
+    var fx = S.fx;
+    [-1, 1].forEach(function (s) {
+      var e = s < 0 ? S.eyeL : S.eyeR;
+      if (has(fx, 'tears')) {
+        feat(ctx, P, s * (EYE.u + 0.06), EYE.v + 0.14, function () {
+          ctx.strokeStyle = '#2f78c4'; ctx.lineWidth = 0.02;
+          ctx.beginPath(); ctx.moveTo(-0.03, 0); ctx.quadraticCurveTo(-0.035, 0.18, -0.02, 0.32);
+          ctx.lineTo(0.02, 0.32); ctx.quadraticCurveTo(0.035, 0.18, 0.03, 0); ctx.closePath();
+          ctx.fillStyle = 'rgba(150,210,255,0.75)'; ctx.fill();
+          var p = fract(t * 0.9 + (s > 0 ? 0.5 : 0));
+          ctx.fillStyle = 'rgba(140,205,255,0.95)';
+          drop(ctx, 0, 0.05 + p * 0.38, 0.055); ctx.fill(); ctx.stroke();
+        }, 0, 0.15);
+      }
+      if (e && e.stream) {   // 滝のようななみだ
+        feat(ctx, P, s * EYE.u, EYE.v + 0.06, function () {
+          var w = Math.sin(t * 14) * 0.01;
+          ctx.fillStyle = 'rgba(130,200,255,0.85)'; ctx.strokeStyle = '#2f78c4'; ctx.lineWidth = 0.018;
+          ctx.beginPath(); ctx.moveTo(-0.09, 0); ctx.lineTo(0.09, 0);
+          ctx.quadraticCurveTo(0.08 + w, 0.25, 0.1, 0.5); ctx.lineTo(-0.1, 0.5); ctx.quadraticCurveTo(-0.08 - w, 0.25, -0.09, 0); ctx.closePath();
+          ctx.fill(); ctx.stroke();
+          ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 0.015;
+          for (var i = 0; i < 2; i++) { var yy = fract(t * 1.5 + i * 0.5) * 0.45; ctx.beginPath(); ctx.moveTo(-0.03 + i * 0.05, yy); ctx.lineTo(-0.03 + i * 0.05, yy + 0.08); ctx.stroke(); }
+        }, 0, 0.12);
+      }
+      if (has(fx, 'laughTears') || has(fx, 'tearSmall')) {
+        var small = !has(fx, 'laughTears');
+        feat(ctx, P, s * (EYE.u + 0.12), EYE.v, function () {
+          for (var i = 0; i < (small ? 1 : 2); i++) {
+            var p = small ? 0.3 : fract(t * 1.6 + i * 0.5);
+            var x = s * (0.04 + p * 0.3), y = -0.05 - Math.sin(p * PI) * 0.18 + p * 0.1;
+            ctx.globalAlpha = small ? 1 : 1 - p;
+            ctx.fillStyle = 'rgba(150,210,255,0.95)'; ctx.strokeStyle = '#2f78c4'; ctx.lineWidth = 0.015;
+            drop(ctx, x, y, 0.045); ctx.fill(); ctx.stroke();
+          }
+          ctx.globalAlpha = 1;
+        }, 0, 0.1);
+      }
+    });
+    if (has(fx, 'snot')) {   // 鼻水
+      feat(ctx, P, 0.03, 0.08, function () {
+        var l = 0.06 + 0.05 * Math.sin(t * 1.8);
+        ctx.fillStyle = 'rgba(140,210,255,0.9)'; ctx.strokeStyle = '#2f78c4'; ctx.lineWidth = 0.015;
+        ctx.beginPath(); ctx.moveTo(-0.015, 0); ctx.lineTo(0.015, 0); ctx.lineTo(0.012, l); ctx.lineTo(-0.012, l); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.arc(0, l, 0.025, 0, TAU); ctx.fill(); ctx.stroke();
+      }, 0, 0.2);
+    }
+    if (has(fx, 'icicle')) { // つらら
+      for (var k = -3; k <= 3; k++) {
+        feat(ctx, P, k * 0.1, FACE.v + FACE.ry - 0.02 - Math.abs(k) * 0.01, function () {
+          ctx.fillStyle = 'rgba(200,240,255,0.95)'; ctx.strokeStyle = '#4a9ad0'; ctx.lineWidth = 0.012;
+          ctx.beginPath(); ctx.moveTo(-0.035, 0); ctx.lineTo(0.035, 0); ctx.lineTo(0, 0.09 + (k % 2 ? 0.04 : 0)); ctx.closePath(); ctx.fill(); ctx.stroke();
+        }, 0, 0.15);
       }
     }
-    if (mood === 'smug') {
-      var tw = [0, 1.7, 3.1];
-      for (i = 0; i < 3; i++) {
-        var k = 0.5 + 0.5 * Math.sin(t * 4 + tw[i]);
-        var pos = [[0.86, -0.72], [-0.92, -0.5], [0.95, 0.05]][i];
-        sparkle(ctx, pos[0] * R, pos[1] * R, R * (0.06 + 0.09 * k), '#fff3a0');
+    if (has(fx, 'spray')) {  // ぶっ(つばが とぶ)
+      feat(ctx, P, 0, MOUTH_V + 0.02, function () {
+        ctx.fillStyle = 'rgba(150,210,255,0.95)';
+        for (var i = 0; i < 8; i++) {
+          var p = fract(t * 1.8 + i / 8), a = -0.2 + (i % 4) * 0.45 + (i > 3 ? PI * 0.5 : 0);
+          var d = 0.08 + p * 0.3;
+          ctx.globalAlpha = 1 - p;
+          ctx.beginPath(); ctx.arc(Math.cos(a) * d * (i % 2 ? 1 : -1), Math.abs(Math.sin(a)) * d * 0.6 + 0.04, 0.022, 0, TAU); ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+      }, 0, 0.2);
+    }
+  }
+
+  // 顔の小物(めがね・サングラス・ばんそうこう・おでこの点)
+  function drawAccFace(ctx, P, S, t) {
+    var acc = S.acc;
+    if (has(acc, 'glasses') || has(acc, 'sunglasses')) {
+      var sun = has(acc, 'sunglasses');
+      [-1, 1].forEach(function (s) {
+        feat(ctx, P, s * EYE.u, EYE.v + 0.01, function () {
+          var r = EYE.r * 1.38;
+          ctx.lineWidth = sun ? 0.04 : 0.035; ctx.strokeStyle = sun ? '#111' : '#6b3a1a';
+          ctx.beginPath();
+          if (sun) { ctx.moveTo(-r, -r * 0.55); ctx.lineTo(r, -r * 0.55); ctx.quadraticCurveTo(r * 1.0, r * 0.8, 0, r * 0.75); ctx.quadraticCurveTo(-r * 1.0, r * 0.8, -r, -r * 0.55); }
+          else ctx.arc(0, 0, r * 0.95, 0, TAU);
+          ctx.closePath();
+          ctx.fillStyle = sun ? '#15151c' : 'rgba(200,230,255,0.25)'; ctx.fill(); ctx.stroke();
+          ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 0.025;
+          ctx.beginPath(); ctx.moveTo(-r * 0.5, -r * 0.2); ctx.lineTo(-r * 0.15, -r * 0.5); ctx.stroke();
+        }, 0, 0.08);
+      });
+      var a = proj(P, -EYE.u + EYE.r * 1.3, EYE.v - 0.04), b = proj(P, EYE.u - EYE.r * 1.3, EYE.v - 0.04);
+      if (a[2] > 0 || b[2] > 0) {
+        ctx.strokeStyle = sun ? '#111' : '#6b3a1a'; ctx.lineWidth = P.R * 0.035;
+        ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.quadraticCurveTo((a[0] + b[0]) / 2, a[1] - P.R * 0.04, b[0], b[1]); ctx.stroke();
       }
     }
-    if (mood === 'shy') {
-      for (i = 0; i < 2; i++) {
-        p = fract(t * 0.45 + i * 0.5);
-        ctx.globalAlpha = Math.min(1, (1 - p) * 1.6);
-        ctx.fillStyle = '#ff6fa3'; ctx.strokeStyle = INK; ctx.lineWidth = R * 0.02;
-        heart(ctx, (i ? -0.85 : 0.9) * R + Math.sin(p * 7) * R * 0.05, -R * (0.4 + p * 0.7), R * 0.13);
-        ctx.fill(); ctx.stroke();
-      }
-      ctx.globalAlpha = 1;
+    if (has(acc, 'bandage')) {
+      feat(ctx, P, -0.45, 0.06, function () {
+        ctx.rotate(-0.6);
+        ctx.fillStyle = '#f3c99a'; ctx.strokeStyle = INK; ctx.lineWidth = 0.02;
+        rrect(ctx, -0.13, -0.045, 0.26, 0.09, 0.04); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#e8b07a'; ctx.fillRect(-0.04, -0.045, 0.08, 0.09);
+        ctx.fillStyle = 'rgba(120,70,30,0.5)';
+        for (var i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(-0.1 + i * 0.1 + (i === 1 ? 0 : 0), 0, 0.008, 0, TAU); ctx.fill(); }
+      }, 0, 0.1);
     }
-    if (mood === 'surprised') {
-      var j = Math.abs(Math.sin(t * 9)) * R * 0.05;
-      outlinedText(ctx, '!', R * 0.8, -R * 0.92 - j, Math.round(R * 0.5), '#ffe14d', INK);
-      ctx.strokeStyle = INK; ctx.lineWidth = R * 0.035;
-      for (i = -1; i <= 1; i++) {
-        var aa = -PI / 2 + i * 0.45 - 0.75;
-        ctx.beginPath(); ctx.moveTo(Math.cos(aa) * R * 1.08, Math.sin(aa) * R * 1.08); ctx.lineTo(Math.cos(aa) * R * 1.3, Math.sin(aa) * R * 1.3); ctx.stroke();
-      }
+    if (has(acc, 'urna')) {
+      feat(ctx, P, 0, -0.4, function () {
+        ctx.fillStyle = '#ffe680'; ctx.strokeStyle = '#a8700c'; ctx.lineWidth = 0.015;
+        ctx.beginPath(); ctx.arc(0, 0, 0.035, 0, TAU); ctx.fill(); ctx.stroke();
+      }, 0, 0.1);
     }
-    if (mood === 'blind') {
-      var bob = Math.sin(t * 2.5) * R * 0.05;
-      ctx.globalAlpha = 0.6 + 0.4 * Math.sin(t * 2.5);
-      outlinedText(ctx, '?', R * 0.82, -R * 0.85 + bob, Math.round(R * 0.38), '#ffffff', INK);
-      outlinedText(ctx, '?', -R * 0.86, -R * 0.62 - bob, Math.round(R * 0.26), '#ffffff', INK);
-      ctx.globalAlpha = 1;
+  }
+  // 頭の上の小物
+  function drawAccTop(ctx, R, S, t, bodyCol) {
+    var acc = S.acc, lw = Math.max(1.5, R * 0.04);
+    ctx.save(); ctx.lineJoin = 'round';
+    if (has(acc, 'horns')) {
+      [-1, 1].forEach(function (s) {
+        ctx.fillStyle = '#ffe9b0'; ctx.strokeStyle = INK; ctx.lineWidth = lw;
+        ctx.beginPath(); ctx.moveTo(s * R * 0.24, -R * 0.93); ctx.quadraticCurveTo(s * R * 0.42, -R * 1.25, s * R * 0.52, -R * 1.32); ctx.quadraticCurveTo(s * R * 0.5, -R * 1.05, s * R * 0.5, -R * 0.82); ctx.closePath(); ctx.fill(); ctx.stroke();
+      });
     }
-    if (mood === 'suspicious') {
-      for (i = 0; i < 3; i++) {
-        var on = fract(t * 0.8) * 4 > i;
-        if (!on) continue;
-        ctx.fillStyle = INK;
-        ctx.beginPath(); ctx.arc(R * (0.62 + i * 0.16), -R * 0.92, R * 0.04, 0, TAU); ctx.fill();
-      }
+    if (has(acc, 'catEars')) {
+      [-1, 1].forEach(function (s) {
+        ctx.fillStyle = bodyCol; ctx.strokeStyle = INK; ctx.lineWidth = lw;
+        ctx.beginPath(); ctx.moveTo(s * R * 0.25, -R * 0.94); ctx.lineTo(s * R * 0.62, -R * 1.22); ctx.lineTo(s * R * 0.72, -R * 0.7); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#ffb0c8';
+        ctx.beginPath(); ctx.moveTo(s * R * 0.37, -R * 0.92); ctx.lineTo(s * R * 0.6, -R * 1.1); ctx.lineTo(s * R * 0.65, -R * 0.8); ctx.closePath(); ctx.fill();
+      });
     }
-    if ((mood === 'shy' || mood === 'mean' || mood === 'surprised' || mood === 'suspicious') && faceC > 0.3) {
-      // 汗
-      p = fract(t * 0.6);
-      ctx.globalAlpha = p < 0.8 ? 1 : (1 - p) * 5;
-      ctx.fillStyle = '#8fd3ff'; ctx.strokeStyle = '#2a6aa8'; ctx.lineWidth = R * 0.02;
-      x = (mood === 'mean' ? -1 : -1) * R * 0.78; y = -R * 0.45 + p * R * 0.18;
-      drop(ctx, x, y, R * 0.1); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath(); ctx.arc(x - R * 0.02, y + R * 0.02, R * 0.018, 0, TAU); ctx.fill();
-      ctx.globalAlpha = 1;
+    if (has(acc, 'afro')) {
+      ctx.fillStyle = '#2a2420'; ctx.strokeStyle = '#111'; ctx.lineWidth = lw;
+      for (var i = 0; i < 9; i++) { var a = PI + i / 8 * PI; ctx.beginPath(); ctx.arc(Math.cos(a) * R * 0.62, -R * 0.62 + Math.sin(a) * R * 0.5, R * 0.26, 0, TAU); ctx.fill(); }
+      ctx.beginPath(); ctx.arc(0, -R * 1.0, R * 0.35, 0, TAU); ctx.fill();
+    }
+    if (has(acc, 'towel')) {
+      ctx.fillStyle = '#ffffff'; ctx.strokeStyle = INK; ctx.lineWidth = lw;
+      ctx.beginPath(); ctx.moveTo(-R * 0.45, -R * 0.86); ctx.quadraticCurveTo(0, -R * 1.12, R * 0.45, -R * 0.86); ctx.lineTo(R * 0.42, -R * 1.0);
+      ctx.quadraticCurveTo(0, -R * 1.26, -R * 0.42, -R * 1.0); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = '#4a8ad8'; ctx.lineWidth = Math.max(1, R * 0.025);
+      ctx.beginPath(); ctx.moveTo(-R * 0.43, -R * 0.93); ctx.quadraticCurveTo(0, -R * 1.18, R * 0.43, -R * 0.93); ctx.stroke();
+    }
+    if (has(acc, 'flower')) {
+      flower(ctx, R * 0.5, -R * 0.88, R * 0.17, '#ff8fc0', 0.3);
     }
     ctx.restore();
   }
 
-  // なみだ(顔に付いて動く)
-  function drawTears(ctx, P, mood, t, s) {
-    if (mood === 'sad') {
-      feat(ctx, P, s * (EYE.u + 0.06), EYE.v + 0.14, function () {
-        ctx.fillStyle = 'rgba(140,205,255,0.9)'; ctx.strokeStyle = '#2f78c4'; ctx.lineWidth = 0.02;
-        // 流れる筋
-        ctx.beginPath(); ctx.moveTo(-0.03, 0); ctx.quadraticCurveTo(-0.035, 0.18, -0.02, 0.32);
-        ctx.lineTo(0.02, 0.32); ctx.quadraticCurveTo(0.035, 0.18, 0.03, 0); ctx.closePath();
-        ctx.fillStyle = 'rgba(150,210,255,0.75)'; ctx.fill();
-        var p = fract(t * 0.9 + (s > 0 ? 0.5 : 0));
-        ctx.fillStyle = 'rgba(140,205,255,0.95)';
-        drop(ctx, 0, 0.05 + p * 0.38, 0.055); ctx.fill(); ctx.stroke();
-      }, 0, 0.15);
-    }
-    if (mood === 'laugh') {
-      feat(ctx, P, s * (EYE.u + 0.12), EYE.v, function () {
-        for (var i = 0; i < 2; i++) {
-          var p = fract(t * 1.6 + i * 0.5);
-          var x = s * (0.04 + p * 0.3), y = -0.05 - Math.sin(p * PI) * 0.18 + p * 0.1;
-          ctx.globalAlpha = 1 - p;
-          ctx.fillStyle = 'rgba(150,210,255,0.95)'; ctx.strokeStyle = '#2f78c4'; ctx.lineWidth = 0.015;
-          drop(ctx, x, y, 0.045); ctx.fill(); ctx.stroke();
-        }
-        ctx.globalAlpha = 1;
-      }, 0, 0.1);
-    }
-  }
+  // 体の色
+  var BODY = {
+    red: ['#ef3a37', '#bf1d25'], fire: ['#ff2a1a', '#9e0a10'], gold: ['#ffe27a', '#c98f12'], white: ['#ffffff', '#d4cdc2'],
+    blue: ['#9ad6ff', '#3a7fd0'], stone: ['#bdb9b2', '#77736c'], soot: ['#6a2a24', '#2e100c'], pink: ['#ff9ac2', '#e0558f']
+  };
+  var FACE_COL = { angry: '#ffe9de', furious: '#ffd5c8', gold: '#fff2c8', stone: '#e4e2de', soot: '#e2d6c8', pale: '#eef6ff' };
 
   // ===== 頭を描く =====
   function drawHead(ctx, cx, cy, size, opts) {
     opts = opts || {};
     var R = size / 2;
     var t = opts.t || 0;
-    var mood = MOOD_LABELS[opts.mood] ? opts.mood : 'normal';
+    var faceDef = opts.face ? FACE_BY_ID[opts.face] : null;
+    var mood = MOOD_RECIPES[opts.mood] ? opts.mood : 'normal';
+    var S = specOf(faceDef ? faceDef.recipe : MOOD_RECIPES[mood]);
+    if (opts.oneEye) S.eyeR = eyeOf('white');
     var turn = clamp(opts.turn == null ? 1 : opts.turn, 0, 1);
     var dir = opts.dir === -1 ? -1 : 1;
     var shake = clamp(opts.shake || 0, 0, 1);
     // 0.5(横)で顔がちゃんと見えるように、回る角度を少しゆがめる
-    var yaw = PI * Math.pow(1 - turn, 1.7);
-    var P = { R: R, yaw: yaw, dir: dir };
+    var yaw = PI * Math.pow(1 - turn, 1.7) + S.yaw * turn * turn;
+    var deco = '#f2c53d', deco2 = '#a8700c';
+    if (S.body === 'gold') { deco = '#c0392b'; deco2 = '#7a1a10'; }
+    else if (S.body === 'blue') { deco = '#ffffff'; deco2 = '#4a8ad8'; }
+    else if (S.body === 'stone') { deco = '#8f8b84'; deco2 = '#5a5751'; }
+    else if (S.body === 'soot') { deco = '#9a7a3a'; deco2 = '#5a4520'; }
+    var P = { R: R, yaw: yaw, dir: dir, deco: deco, deco2: deco2 };
     var faceC = Math.cos(yaw);
-    var S = moodSpec(mood, t);
-    if (opts.oneEye) S.eyeR = E({ type: 'blank' });
 
     // 体の動き(起き上がりこぼしのように、底を中心にゆれる)
-    var rot = 0, ox = 0, oy = 0;
-    if (mood === 'laugh') { oy = -Math.abs(Math.sin(t * 12)) * R * 0.05; rot = Math.sin(t * 12) * 0.05; }
-    if (mood === 'dizzy') rot = Math.sin(t * 2.6) * 0.12;
-    if (mood === 'angry') ox = Math.sin(t * 70) * R * 0.01;
-    if (mood === 'furious') { ox = Math.sin(t * 80) * R * 0.025; oy = Math.sin(t * 53) * R * 0.01; }
-    if (mood === 'sad') ox = Math.sin(t * 45) * R * 0.005;
-    if (mood === 'smug') rot = -0.07 * dir;
-    if (mood === 'shy') rot = 0.05 * dir + Math.sin(t * 1.6) * 0.03;
-    if (mood === 'sleepy') rot = Math.sin(t * 0.9) * 0.05;
-    if (mood === 'happy') rot = Math.sin(t * 3) * 0.035;
+    var rot = 0, ox = 0, oy = 0, sx = 1, sy = 1;
+    switch (S.anim) {
+      case 'bounce': oy = -Math.abs(Math.sin(t * 12)) * R * 0.05; rot = Math.sin(t * 12) * 0.05; break;
+      case 'wobble': rot = Math.sin(t * 2.6) * 0.12; break;
+      case 'tremble': ox = Math.sin(t * 70) * R * 0.01; break;
+      case 'trembleBig': ox = Math.sin(t * 70) * R * 0.025; rot = Math.sin(t * 53) * 0.03; break;
+      case 'trembleSmall': ox = Math.sin(t * 45) * R * 0.005; break;
+      case 'sway': rot = Math.sin(t * 3) * 0.035; break;
+      case 'shy': rot = 0.05 * dir + Math.sin(t * 1.6) * 0.03; break;
+      case 'doze': rot = Math.sin(t * 0.9) * 0.05; break;
+      case 'tiltUp': rot = -0.07 * dir; break;
+      case 'tiltL': rot = -0.12 * dir; break;
+      case 'tiltBig': rot = 0.38 * dir; break;
+      case 'bow': rot = 0.2 * dir; sy = 0.96; break;
+      case 'shake': ox = Math.sin(t * 40) * R * 0.035; break;
+      case 'jump': oy = -Math.abs(Math.sin(t * 5)) * R * 0.12; break;
+      case 'roll': rot = Math.sin(t * 4) * 0.3; break;
+      case 'squash': sx = 1 + 0.08 * Math.sin(t * 6); sy = 1 - 0.08 * Math.sin(t * 6); break;
+      case 'twitch': if (fract(t * 1.3) < 0.12) { ox = R * 0.03; rot = 0.04; } break;
+    }
     if (shake) { ox += Math.sin(t * 48) * shake * R * 0.05; rot += Math.sin(t * 37) * shake * 0.06; }
     var breathe = 1 + 0.012 * Math.sin(t * 2.2);
 
     ctx.save();
     ctx.translate(cx, cy);
-    // 足もとの影
     if (opts.shadow !== false) {
       var sg = ctx.createRadialGradient(0, R * BOTTOM, 0, 0, R * BOTTOM, R * 0.75);
       sg.addColorStop(0, 'rgba(0,0,0,0.32)'); sg.addColorStop(1, 'rgba(0,0,0,0)');
@@ -880,16 +1666,26 @@
     }
     ctx.translate(ox, oy + R * BOTTOM);
     ctx.rotate(rot);
-    ctx.scale(2 - breathe, breathe);
+    ctx.scale((2 - breathe) * sx, breathe * sy);
     ctx.translate(0, -R * BOTTOM);
 
-    // 体(赤)
+    drawFxBack(ctx, R, S, t);
+
+    // 体
     bodyPath(ctx, R);
-    var base = ctx.createLinearGradient(0, -R, 0, R);
-    if (mood === 'angry') { base.addColorStop(0, '#ff3b2f'); base.addColorStop(1, '#b3121c'); }
-    else if (mood === 'furious') { base.addColorStop(0, '#ff2414'); base.addColorStop(1, '#7a0008'); }
-    else { base.addColorStop(0, '#ef3a37'); base.addColorStop(1, '#bf1d25'); }
-    ctx.fillStyle = base; ctx.fill();
+    var bodyCol;
+    if (S.body === 'rainbow') {
+      var rg = ctx.createLinearGradient(-R, -R, R, R);
+      for (var hi = 0; hi <= 6; hi++) rg.addColorStop(hi / 6, 'hsl(' + ((hi * 55 + t * 80) % 360) + ',85%,58%)');
+      ctx.fillStyle = rg; bodyCol = '#ff6fa0';
+    } else {
+      var bc = BODY[S.body] || BODY.red;
+      if (S.body === 'red' && S.tint === 'angry') bc = ['#ff3b2f', '#b3121c'];
+      var base = ctx.createLinearGradient(0, -R, 0, R);
+      base.addColorStop(0, bc[0]); base.addColorStop(1, bc[1]);
+      ctx.fillStyle = base; bodyCol = bc[0];
+    }
+    ctx.fill();
 
     ctx.save();
     bodyPath(ctx, R); ctx.clip();
@@ -898,57 +1694,91 @@
     drawSideSwirls(ctx, P);
     if (Math.cos(yaw - PI) > 0.02) drawBack(ctx, P, opts);
 
-    // 顔
-    var fc = mood === 'angry' ? '#ffe9de' : mood === 'furious' ? '#ffd0c0' : '#fffaf0';
+    var fc = FACE_COL[S.tint] || (S.body === 'gold' ? FACE_COL.gold : '#fffaf0');
     if (faceC > -0.6) {
       facePath(ctx, P);
       var fg = ctx.createRadialGradient(-R * 0.12, -R * 0.3, R * 0.05, 0, -R * 0.1, R * 0.75);
       fg.addColorStop(0, '#ffffff'); fg.addColorStop(0.7, fc); fg.addColorStop(1, '#f1dfc4');
       ctx.fillStyle = fg; ctx.fill();
-      // 怒り・いじわる・かなしみ の色
       if (S.tint) {
         ctx.save(); facePath(ctx, P); ctx.clip();
-        var tg;
-        if (S.tint === 'angry') {
-          tg = ctx.createLinearGradient(0, -R * 0.6, 0, R * 0.2);
-          var fu = S.furious ? 0.25 : 0;
-          tg.addColorStop(0, 'rgba(255,40,30,' + (0.35 + fu + 0.12 * Math.sin(t * 8)) + ')'); tg.addColorStop(1, 'rgba(255,60,40,' + (0.08 + fu) + ')');
-        } else if (S.tint === 'mean') {
-          tg = ctx.createLinearGradient(0, -R * 0.68, 0, -R * 0.3);
-          tg.addColorStop(0, 'rgba(90,30,140,0.38)'); tg.addColorStop(1, 'rgba(90,30,140,0)');
-        } else {
-          tg = ctx.createLinearGradient(0, -R * 0.65, 0, -R * 0.2);
-          tg.addColorStop(0, 'rgba(60,90,200,0.3)'); tg.addColorStop(1, 'rgba(60,90,200,0)');
+        var tg = null, i2, pp;
+        switch (S.tint) {
+          case 'angry':
+            tg = ctx.createLinearGradient(0, -R * 0.6, 0, R * 0.2);
+            tg.addColorStop(0, 'rgba(255,40,30,' + (0.35 + 0.12 * Math.sin(t * 8)) + ')'); tg.addColorStop(1, 'rgba(255,60,40,0.08)'); break;
+          case 'furious':
+            tg = ctx.createLinearGradient(0, -R * 0.7, 0, R * 0.5);
+            tg.addColorStop(0, 'rgba(230,10,10,' + (0.7 + 0.15 * Math.sin(t * 10)) + ')'); tg.addColorStop(1, 'rgba(255,40,20,0.35)'); break;
+          case 'mean':
+            tg = ctx.createLinearGradient(0, -R * 0.68, 0, -R * 0.3);
+            tg.addColorStop(0, 'rgba(90,30,140,0.38)'); tg.addColorStop(1, 'rgba(90,30,140,0)'); break;
+          case 'sad':
+            tg = ctx.createLinearGradient(0, -R * 0.65, 0, -R * 0.2);
+            tg.addColorStop(0, 'rgba(60,90,200,0.3)'); tg.addColorStop(1, 'rgba(60,90,200,0)'); break;
+          case 'gloom':
+            tg = ctx.createLinearGradient(0, -R * 0.7, 0, R * 0.1);
+            tg.addColorStop(0, 'rgba(60,40,110,0.65)'); tg.addColorStop(1, 'rgba(60,40,110,0.05)'); break;
+          case 'pale': tg = 'rgba(120,170,255,0.32)'; break;
+          case 'green':
+            tg = ctx.createLinearGradient(0, -R * 0.7, 0, R * 0.3);
+            tg.addColorStop(0, 'rgba(90,190,60,0.6)'); tg.addColorStop(1, 'rgba(90,190,60,0.05)'); break;
+          case 'yellow': tg = 'rgba(255,225,40,0.42)'; break;
+          case 'pink': tg = 'rgba(255,110,160,0.26)'; break;
+          case 'gold': tg = 'rgba(255,200,60,0.3)'; break;
+          case 'grey': tg = 'rgba(120,120,130,0.4)'; break;
+          case 'stone': tg = 'rgba(110,108,104,0.5)'; break;
+          case 'soot': tg = 'rgba(60,40,30,0.45)'; break;
         }
-        ctx.fillStyle = tg; ctx.fillRect(-R, -R, R * 2, R * 1.4);
-        // かなしみの縦線
-        if (S.tint === 'sad') {
-          ctx.strokeStyle = 'rgba(50,70,160,0.55)'; ctx.lineWidth = R * 0.018;
-          for (var i = -3; i <= 3; i++) {
-            var pp = proj(P, i * 0.07, -0.58);
-            ctx.beginPath(); ctx.moveTo(pp[0], pp[1]); ctx.lineTo(pp[0], pp[1] + R * (i % 2 ? 0.12 : 0.17)); ctx.stroke();
+        if (tg) { ctx.fillStyle = tg; ctx.fillRect(-R, -R, R * 2, R * 1.6); }
+        if (S.tint === 'sad' || S.tint === 'gloom') {   // 縦線
+          ctx.strokeStyle = S.tint === 'sad' ? 'rgba(50,70,160,0.55)' : 'rgba(30,20,60,0.7)'; ctx.lineWidth = Math.max(1, R * 0.018);
+          for (i2 = -4; i2 <= 4; i2++) {
+            pp = proj(P, i2 * 0.07, -0.6);
+            ctx.beginPath(); ctx.moveTo(pp[0], pp[1]); ctx.lineTo(pp[0], pp[1] + R * (S.tint === 'gloom' ? 0.28 : (i2 % 2 ? 0.12 : 0.17))); ctx.stroke();
           }
+        }
+        if (S.tint === 'gekiga') {   // 劇画の斜線
+          ctx.strokeStyle = 'rgba(30,20,15,0.6)'; ctx.lineWidth = Math.max(1, R * 0.018);
+          for (i2 = 0; i2 < 7; i2++) {
+            [-1, 1].forEach(function (s) {
+              var q = proj(P, s * (0.5 - i2 * 0.012), -0.4 + i2 * 0.11);
+              ctx.beginPath(); ctx.moveTo(q[0], q[1]); ctx.lineTo(q[0] - s * R * 0.12, q[1] + R * 0.07); ctx.stroke();
+            });
+          }
+        }
+        if (S.tint === 'stone') {    // 石のヒビ
+          ctx.strokeStyle = 'rgba(60,58,55,0.8)'; ctx.lineWidth = Math.max(1, R * 0.02);
+          var c1 = proj(P, -0.2, -0.55), c2 = proj(P, -0.1, -0.3), c3 = proj(P, -0.22, -0.1);
+          ctx.beginPath(); ctx.moveTo(c1[0], c1[1]); ctx.lineTo(c2[0], c2[1]); ctx.lineTo(c3[0], c3[1]); ctx.stroke();
         }
         ctx.restore();
       }
       // 金のふち
       facePath(ctx, P);
       ctx.lineJoin = 'round';
-      ctx.lineWidth = R * 0.085; ctx.strokeStyle = '#a8700c'; ctx.stroke();
-      ctx.lineWidth = R * 0.055; ctx.strokeStyle = '#f4c63e'; ctx.stroke();
+      ctx.lineWidth = R * 0.085; ctx.strokeStyle = S.body === 'gold' ? '#7a1a10' : '#a8700c'; ctx.stroke();
+      ctx.lineWidth = R * 0.055; ctx.strokeStyle = S.body === 'gold' ? '#c0392b' : (S.body === 'stone' ? '#9a968f' : '#f4c63e'); ctx.stroke();
       ctx.lineWidth = R * 0.015; ctx.strokeStyle = '#fff1a8';
       facePath(ctx, P, 0.012); ctx.stroke();
 
       // ほっぺ
-      if (S.cheek > 0) {
+      if (S.cheek > 0 || S.puff) {
         [-1, 1].forEach(function (s) {
-          feat(ctx, P, s * 0.45, 0.1, function () {
-            var a = Math.min(1, S.cheek);
-            var cg = ctx.createRadialGradient(0, 0, 0, 0, 0, 0.11 * (S.cheek > 1 ? 1.3 : 1));
+          feat(ctx, P, s * (S.puff ? 0.43 : 0.45), S.puff ? 0.13 : 0.1, function () {
+            var big = S.cheek > 1 ? 1.3 : 1, a = Math.min(1, S.cheek);
+            if (S.puff) {   // ぷくー
+              ctx.fillStyle = 'rgba(255,170,175,0.85)'; ctx.strokeStyle = INK; ctx.lineWidth = 0.025;
+              ctx.beginPath(); ctx.arc(0, 0, 0.16, 0, TAU); ctx.fill();
+              ctx.beginPath(); ctx.arc(0, 0, 0.16, s > 0 ? -1.2 : PI - 0.6, s > 0 ? 0.6 : PI + 1.2); ctx.stroke();
+              ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.beginPath(); ctx.arc(-0.05, -0.06, 0.03, 0, TAU); ctx.fill();
+              return;
+            }
+            var cg = ctx.createRadialGradient(0, 0, 0, 0, 0, 0.11 * big);
             cg.addColorStop(0, 'rgba(255,95,120,' + (0.75 * a) + ')'); cg.addColorStop(1, 'rgba(255,95,120,0)');
             ctx.fillStyle = cg;
-            ctx.beginPath(); ctx.ellipse(0, 0, 0.14 * (S.cheek > 1 ? 1.3 : 1), 0.09 * (S.cheek > 1 ? 1.3 : 1), 0, 0, TAU); ctx.fill();
-            if (S.cheek > 1) { // てれの斜線
+            ctx.beginPath(); ctx.ellipse(0, 0, 0.14 * big, 0.09 * big, 0, 0, TAU); ctx.fill();
+            if (S.cheek > 1) {
               ctx.strokeStyle = 'rgba(220,40,80,0.8)'; ctx.lineWidth = 0.018; ctx.lineCap = 'round';
               ctx.beginPath();
               for (var k = -1; k <= 1; k++) { ctx.moveTo(k * 0.055 - 0.02, 0.035); ctx.lineTo(k * 0.055 + 0.025, -0.035); }
@@ -957,25 +1787,23 @@
           }, 0, 0.1);
         });
       }
-      // 眉
       drawBrow(ctx, P, S.browL, -1);
       drawBrow(ctx, P, S.browR, 1);
-      // 目(振り向き中は、こっちを見る)
       var bl = blinkOpen(t, 0);
       var lookAdd = [0, 0];
       if (opts.look) { S.eyeL.look = opts.look; S.eyeR.look = opts.look; }
       else if (turn < 1 && faceC > 0) lookAdd = [-dir * Math.sin(yaw) * 0.8, 0];
-      drawEye(ctx, P, S.eyeL, -1, t, bl, fc, lookAdd, opts);
-      drawEye(ctx, P, S.eyeR, 1, t, bl, fc, lookAdd, opts);
+      drawEye(ctx, P, S.eyeL, -1, t, bl, fc, lookAdd);
+      drawEye(ctx, P, S.eyeR, 1, t, bl, fc, lookAdd);
       // 鼻
       feat(ctx, P, 0, 0.04, function () {
-        ctx.fillStyle = '#f5a48e'; ctx.strokeStyle = INK; ctx.lineWidth = 0.022;
-        ctx.beginPath(); ctx.ellipse(0, 0, 0.05, 0.04, 0, 0, TAU); ctx.fill(); ctx.stroke();
+        var red = S.nose === 'red';
+        ctx.fillStyle = red ? '#ff3b30' : '#f5a48e'; ctx.strokeStyle = INK; ctx.lineWidth = 0.022;
+        ctx.beginPath(); ctx.ellipse(0, red ? 0.01 : 0, red ? 0.09 : 0.05, red ? 0.08 : 0.04, 0, 0, TAU); ctx.fill(); ctx.stroke();
         ctx.fillStyle = 'rgba(255,255,255,0.8)';
-        ctx.beginPath(); ctx.arc(-0.012, -0.01, 0.01, 0, TAU); ctx.fill();
+        ctx.beginPath(); ctx.arc(red ? -0.03 : -0.012, red ? -0.02 : -0.01, red ? 0.022 : 0.01, 0, TAU); ctx.fill();
       }, 0, 0.1);
-      // ねむい: 鼻ちょうちん
-      if (mood === 'sleepy') {
+      if (S.bubble) {   // 鼻ちょうちん
         feat(ctx, P, 0.04, 0.07, function () {
           var ph = fract(t / 2.6), br = 0.03 + 0.13 * Math.sin(ph * PI * 0.5);
           if (ph > 0.94) return;
@@ -985,15 +1813,15 @@
           ctx.beginPath(); ctx.arc(br * 0.5, br * 0.25, br * 0.22, 0, TAU); ctx.fill();
         }, 0, 0.2);
       }
-      // ひげ
-      drawMustache(ctx, P, -1, mood, t);
-      drawMustache(ctx, P, 1, mood, t);
+      drawMustache(ctx, P, -1, S, t);
+      drawMustache(ctx, P, 1, S, t);
       drawMouth(ctx, P, S.mouth, t);
       drawBeard(ctx, P, S.mouth);
-      drawTears(ctx, P, mood, t, -1);
-      drawTears(ctx, P, mood, t, 1);
+      drawFaceFx(ctx, P, S, t);
+      drawAccFace(ctx, P, S, t);
     }
-    if (mood === 'blind') drawBlindfold(ctx, P, t);
+    if (S.blind) drawBand(ctx, P, t, EYE.v - 0.15, EYE.v + 0.13, 'blind');
+    if (has(S.acc, 'hachimaki')) drawBand(ctx, P, t, -0.86, -0.7, 'hachimaki');
 
     // 光と影(つやつやの漆)
     var sh = ctx.createRadialGradient(-R * 0.32, -R * 0.42, R * 0.1, 0, 0, R * 1.2);
@@ -1011,13 +1839,46 @@
     ctx.restore();
     ctx.restore(); // clip
 
-    // ふちどり
     bodyPath(ctx, R);
     ctx.lineJoin = 'round';
-    ctx.lineWidth = Math.max(2.5, R * 0.05); ctx.strokeStyle = INK; ctx.stroke();
+    ctx.lineWidth = Math.max(R < 25 ? 1.5 : 2.5, R * 0.05); ctx.strokeStyle = INK; ctx.stroke();
 
-    drawExtras(ctx, R, mood, t, faceC);
+    drawAccTop(ctx, R, S, t, bodyCol);
+    drawFxTop(ctx, R, S, t, faceC, dir);
     ctx.restore();
+  }
+
+  // 表情 id で前向きのだるまを描く
+  function drawFace(ctx, cx, cy, size, faceId, opts) {
+    var o = {}, k;
+    if (opts) for (k in opts) o[k] = opts[k];
+    o.face = faceId; if (o.turn == null) o.turn = 1;
+    drawHead(ctx, cx, cy, size, o);
+  }
+  // まだ見ていない顔(「?」の影絵)
+  function drawFaceLocked(ctx, cx, cy, size) {
+    var R = size / 2;
+    ctx.save(); ctx.translate(cx, cy);
+    bodyPath(ctx, R);
+    ctx.fillStyle = '#3b3152'; ctx.fill();
+    ctx.lineWidth = Math.max(1.5, R * 0.05); ctx.strokeStyle = '#1d1730'; ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(0, (FACE.v + 0.04) * R, FACE.rx * R, FACE.ry * R, 0, 0, TAU);
+    ctx.fillStyle = '#4e4469'; ctx.fill();
+    outlinedText(ctx, '?', 0, (FACE.v + 0.06) * R, Math.max(8, Math.round(R * 0.85)), '#d9d0f0', '#1d1730');
+    ctx.restore();
+  }
+  // 結果画面用: 表情の小さな絵を1回だけ描いてためておく(毎フレーム100こ描かなくてよい)
+  var thumbCache = {};
+  function faceThumb(faceId, size, scale) {
+    scale = scale || 2;
+    var key = faceId + '|' + size + '|' + scale;
+    if (thumbCache[key]) return thumbCache[key];
+    var W = Math.ceil(size * 1.5 * scale), c = makeCanvas(W, W), x = c.getContext('2d');
+    x.setTransform(scale, 0, 0, scale, 0, 0);
+    if (faceId && FACE_BY_ID[faceId]) drawFace(x, size * 0.75, size * 0.78, size, faceId, { t: 0.8, shadow: false });
+    else drawFaceLocked(x, size * 0.75, size * 0.78, size);
+    thumbCache[key] = c;
+    return c;
   }
 
   // ---------------------------------------------------------------
@@ -1837,6 +2698,11 @@
     drawHammer: drawHammer,
     drawBackground: drawBackground,
     drawItem: drawItem,
+    drawFace: drawFace,           // 表情 id で前向きのだるま
+    drawFaceLocked: drawFaceLocked, // まだ見ていない顔(?の影絵)
+    faceThumb: faceThumb,         // 表情の小さな絵(ためておく canvas)
+    FACES: FACES,                 // 表情 100 こ {id, name, group, recipe}
+    FACE_GROUPS: FACE_GROUPS,     // グループの日本語名
     MOODS: MOODS,                 // 表情の名前の一覧
     MOOD_LABELS: MOOD_LABELS,     // 表情の日本語名
     BLOCK_KINDS: BLOCK_KINDS,     // 段の種類の一覧

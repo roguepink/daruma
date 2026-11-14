@@ -46,6 +46,7 @@
     SPICE_FEINT: 0.10, SPICE_FAST: 0.12, SPICE_DOUBLE: 0.08,      // 気分の確率に足す
     FAST_LETTER_MUL: 0.35, FAST_LETTER_MIN: 0.06, TELL_MIN_FAST: 0.53,   // 早口: 予兆+猶予 = 0.65 秒以上
     PEEK_EVERY: [15, 25], PEEK_DUR: 0.4, PEEK_SAFE_LEFT: 0.7, PEEK_SPEEDUP: 0.6, PEEK_TUTORIAL_AT: 7,
+    REACT_PRE: 0.3, REACT_GRACE: 0.25, REACT_WATCH: 1.2, REACT_DEMO_PRE: 1.0, TSUNTSUN_JOY_P: 0.15, FACE_COMMON_P: 0.10, FACE_RARE_P: 0.025,
     MYSTERY_REVEAL: 1.0, MUTEKI_SEC: 5, GEKIDO_SEC: [8, 10], MYSTERY_MUTEKI_P: 0.5,
     PERFECT_SEC: 5, PERFECT_DROP_RATE: 3.5, PERFECT_TAP_DROPS: 2, HENGAO_COOLDOWN: 12, TICKLE_MOOD_CYCLES: 1, TIMESTOP_SEC: 3, DOUBLE_SCORE_SEC: 10, GOLD_MALLET_HITS: 6,
     // 演出
@@ -438,6 +439,32 @@
       if (p.k === 'WATCH' && p.s >= t) { var nd = (p.e - p.s) * mul, by = nd - (p.e - p.s); p.e = p.s + nd; shiftAfter(d, i + 1, by); return; }
     }
   }
+  // 反応の顔の一覧(game.js が DARUMA_ART.FACES か 仮の一覧を入れる)
+  var FACE_LIST = [];
+  function setFaces(list) { FACE_LIST = list || []; }
+  function pickFace(S, group) {
+    if (!FACE_LIST.length) return null;
+    var r = S.rng(), g = group;
+    if (r < CONFIG.FACE_RARE_P) g = 'rare'; else if (r < CONFIG.FACE_RARE_P + CONFIG.FACE_COMMON_P) g = 'common';
+    var c = FACE_LIST.filter(function (f) { return f.group === g; });
+    if (!c.length) c = FACE_LIST.filter(function (f) { return f.group === group; });
+    if (!c.length) c = FACE_LIST;
+    return c[Math.floor(S.rng() * c.length)].id;
+  }
+  // ちょっかいの反応: 「!?」(pre 秒)→ 首が回る(0.25秒はセーフ)→ 反応の顔(1.2秒 見ている)→ 戻る → 「だ」から言い直し
+  function reactTurn(S, t, face, kind, pre) {
+    var d = S.d;
+    cutAt(d, t);
+    d.cy++;
+    var t0 = t, cy = d.cy;
+    function push(k, dur) { var p = { k: k, s: t0, e: t0 + dur, L: [], cy: cy, react: kind || true }; d.ph.push(p); t0 += dur; return p; }
+    push('WARN', pre || CONFIG.REACT_PRE).say = '!?';
+    push('GRACE', CONFIG.REACT_GRACE);
+    push('WATCH', CONFIG.REACT_WATCH).face = face;
+    push('RETURN', CONFIG.RETURN_DUR);
+    addCycle(S, t0, 0);
+    return { type: 'react', face: face, kind: kind };
+  }
   // ばくだん: 向こう向きなら、今から最短の予兆で振り向く
   function forceTurn(S, t) {
     var k = kindAt(S.d, t);
@@ -578,6 +605,7 @@
         if (S.tutorial) {
           S.tutTurns++;
           if (S.tutTurns >= CONFIG.TUTORIAL_TURNS) { endTutorial(S); ev.push({ type: 'tutorialDone' }); }
+          else if (S.tutTurns === 1 && !S.tutReactShown) { S.tutReactShown = true; ev.push(reactTurn(S, t1 + 0.6, pickFace(S, 'tsuntsun'), 'demo', CONFIG.REACT_DEMO_PRE)); ev.push({ type: 'reactDemo' }); }
         }
       }
       if (e.prev === 'PERFECT') ev.push({ type: 'perfectEnd', count: S.perfCount || 0, pts: S.perfPts || 0 });
@@ -724,8 +752,9 @@
   function canUseChotto(S, name, t) {
     if (S.out) return false;
     var k = kindAt(S.d, t);
-    if (name === 'hengao') { var p = phaseAt(S.d, t); return k === 'WATCH' && S.hengaoPh !== p && !isBlind(S, t) && t >= (S.hengaoReadyAt || 0); }
-    if (!CHOTTO_PHASES[k]) return false;
+    var cp = phaseAt(S.d, t);
+    if (name === 'hengao') { return k === 'WATCH' && S.hengaoPh !== cp && !isBlind(S, t) && t >= (S.hengaoReadyAt || 0) && !(cp && cp.react); }
+    if (!CHOTTO_PHASES[k] || (cp && cp.react)) return false;
     if (name === 'ijiwaru') return t >= S.teaseReadyAt;
     return S.tama >= CHOTTO[name].cost;
   }
@@ -737,39 +766,31 @@
   function useChotto(S, name, t) {
     if (!canUseChotto(S, name, t)) return null;
     var ev = [], mood = S.d.mood, rng = S.rng;
+    // ちょっかいを すると「!?」→ くるっと こっちを向いて 反応の顔を見せる(2026-11-14 ノブさん)
+    S.tutReactShown = true;
     if (name === 'kusuguru') {
       S.tama -= 1;
-      if (bored(S, name, t)) { setMood(S, 'ijiwaru', 2, t); ev.push({ type: 'bored', name: name }); return ev; }
-      var inWarn = kindAt(S.d, t) === 'WARN';
-      if (inWarn) {
-        // 予兆の最中は 気分も変えない(「くすくす…でも 見るよ」)。逃げボタンにしないため
-        insertPause(S, t, CONFIG.TICKLE_PAUSE, 'FROZEN', 'くすくす');              // 予兆は そのまま(残りは TELL_MIN 以上)
-      } else {
-        S.d.prev = S.d.mood === 'bikkuri' ? S.d.prev : S.d.mood;
-        S.d.mood = 'gokigen'; S.d.left = CONFIG.TICKLE_MOOD_CYCLES;
-        rebuild(S, t, { sec: CONFIG.TICKLE_PAUSE, kind: 'FROZEN', say: 'くすくす' }, 0);
-      }
-      ev.push({ type: 'tickle', warn: inWarn });
+      if (bored(S, name, t)) { setMoodRaw(S.d, 'ijiwaru', 2); ev.push(reactTurn(S, t, pickFace(S, 'common'), 'bored')); ev.push({ type: 'bored', name: name }); return ev; }
+      setMoodRaw(S.d, 'gokigen', CONFIG.TICKLE_MOOD_CYCLES);
+      ev.push(reactTurn(S, t, pickFace(S, 'kusuguru'), 'kusuguru'));
+      ev.push({ type: 'tickle' });
     } else if (name === 'dajare') {
       S.tama -= 1;
       var joke = DAJARE[Math.floor(rng() * DAJARE.length)];
-      if (bored(S, name, t)) { setMood(S, 'ijiwaru', 2, t); ev.push({ type: 'bored', name: name, joke: joke }); return ev; }
+      if (bored(S, name, t)) { setMoodRaw(S.d, 'ijiwaru', 2); ev.push(reactTurn(S, t, pickFace(S, 'common'), 'bored')); ev.push({ type: 'bored', name: name, joke: joke }); return ev; }
       var uke = rng() < DAJARE_UKE[mood];
-      if (uke) {
-        S.counts.dajareUke++;
-        setMood(S, 'gokigen', 2, t);
-        insertPause(S, t, CONFIG.DAJARE_PAUSE, 'FROZEN', 'あはは!');
-        ev.push({ type: 'dajare', joke: joke, uke: true });
-      } else if (mood === 'nemui') {
-        ev.push({ type: 'dajare', joke: joke, uke: false, sleep: true });
-      } else {
-        setMood(S, 'okori', 2, t);
-        ev.push({ type: 'dajare', joke: joke, uke: false });
-      }
+      if (uke) { S.counts.dajareUke++; setMoodRaw(S.d, 'gokigen', 2); }
+      else if (mood !== 'nemui') setMoodRaw(S.d, 'okori', 2);
+      ev.push(reactTurn(S, t, pickFace(S, 'dajare'), uke ? 'uke' : 'flop'));
+      ev.push({ type: 'dajare', joke: joke, uke: uke, sleep: !uke && mood === 'nemui' });
     } else if (name === 'ijiwaru') {
       S.teaseReadyAt = t + CONFIG.TEASE_COOLDOWN;
-      if (mood === 'okori') setMood(S, 'nakisou', 3, t); else setMood(S, 'okori', 4, t);
-      ev.push({ type: 'tease', cry: mood === 'okori' });
+      var joy = rng() < CONFIG.TSUNTSUN_JOY_P;     // つんつんで たまに よろこぶ
+      if (joy) setMoodRaw(S.d, 'gokigen', 1);
+      else if (mood === 'okori' || mood === 'gekido') setMoodRaw(S.d, 'nakisou', 3);
+      else setMoodRaw(S.d, 'okori', 4);
+      ev.push(reactTurn(S, t, pickFace(S, joy ? 'kusuguru' : 'tsuntsun'), joy ? 'joy' : 'tsuntsun'));
+      ev.push({ type: 'tease', cry: !joy && (mood === 'okori' || mood === 'gekido'), joy: joy });
     } else if (name === 'hengao') {
       // にらめっこ: こっち向きを縮めるだけ(気分は変えない)。使ったら待ち時間。同じ手を続けると あきる
       S.hengaoPh = phaseAt(S.d, t);
@@ -788,7 +809,8 @@
   }
   function canUseItem(S, slot, t) {
     if (S.out || !S.slots[slot]) return false;
-    return !!CHOTTO_PHASES[kindAt(S.d, t)];
+    var ip = phaseAt(S.d, t);
+    return !!CHOTTO_PHASES[kindAt(S.d, t)] && !(ip && ip.react);
   }
   function useItem(S, slot, t) {
     if (!canUseItem(S, slot, t)) return null;
@@ -877,6 +899,7 @@
     CONFIG: CONFIG, MOODS: MOODS, MOOD_KEYS: MOOD_KEYS, FACE_KEYS: FACE_KEYS, MOOD_DRIFT: MOOD_DRIFT, WARMUP_DRIFT: WARMUP_DRIFT,
     BLOCKS: BLOCKS, BLOCK_ORDER: BLOCK_ORDER, BLOCK_WEIGHTS: BLOCK_WEIGHTS, ITEM_POOL: ITEM_POOL, ITEMS: ITEMS, CHOTTO: CHOTTO, CHOTTO_KEYS: CHOTTO_KEYS,
     DAJARE: DAJARE, DAJARE_UKE: DAJARE_UKE, LINES: LINES, TITLES: TITLES,
+    setFaces: setFaces, pickFace: pickFace, reactTurn: reactTurn,
     makeRng: makeRng, rRange: rRange, rInt: rInt, wpick: wpick, clamp: clamp,
     stageOf: stageOf, stageNow: stageNow, makeCycle: makeCycle, phaseAt: phaseAt, kindAt: kindAt, chantIndex: chantIndex,
     isWatching: isWatching, isBlind: isBlind, isDanger: isDanger, setMood: setMood, insertPause: insertPause, cutWatch: cutWatch,

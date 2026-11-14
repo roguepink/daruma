@@ -31,6 +31,45 @@
   function headBottom() { return (ART && ART.HEAD_BOTTOM) || 0.45; }
   function safeDraw(name, args) { try { art(name).apply(null, args); } catch (e) { try { FB[name].apply(null, args); } catch (e2) {} } }
 
+  // ------------------------------------------------------------------ 反応の顔(全部で100個の予定)
+  // 絵の係が DARUMA_ART.FACES([{id,name,group}])を作るまでは、いまの14表情を 仮の一覧として使う。絵が来たら 自動でそちらを使う
+  var FALLBACK_FACES = [
+    { id: 'angry', name: 'ぷんすか', group: 'tsuntsun' }, { id: 'suspicious', name: 'じとー', group: 'tsuntsun' }, { id: 'mean', name: 'にやり', group: 'tsuntsun' },
+    { id: 'laugh', name: 'げらげら', group: 'dajare' }, { id: 'dizzy', name: 'くらくら', group: 'dajare' }, { id: 'surprised', name: 'びくっ', group: 'dajare' },
+    { id: 'happy', name: 'にこにこ', group: 'kusuguru' }, { id: 'shy', name: 'てれてれ', group: 'kusuguru' },
+    { id: 'smug', name: 'ドヤ', group: 'common' }, { id: 'normal', name: 'きょとん', group: 'common' }, { id: 'sleepy', name: 'ねむねむ', group: 'common' }, { id: 'sad', name: 'うるうる', group: 'common' },
+    { id: 'oneeye', name: '片目', group: 'rare' }, { id: 'blind', name: '目かくし', group: 'rare' }
+  ];
+  function realFaces() { var A = window.DARUMA_ART; return A && A.FACES && A.FACES.length ? A.FACES : null; }
+  function faceList() { return realFaces() || FALLBACK_FACES; }
+  function faceById(id) { var L = faceList(); for (var i = 0; i < L.length; i++) if (L[i].id === id) return L[i]; return null; }
+  // 気分・チラ見・アウトの顔(絵の表情名)を、一覧の id か 名前で さがす
+  function faceIdOfArt(artMood) { var L = faceList(); for (var i = 0; i < L.length; i++) if (L[i].id === artMood || L[i].name === artMood) return L[i].id; return null; }
+  D.setFaces(faceList());
+  function drawFaceById(c, x, y, size, id, opts) {
+    opts = opts || {};
+    var A = window.DARUMA_ART;
+    try {
+      if (realFaces()) {
+        if (opts.turn == null && typeof A.drawFace === 'function') { A.drawFace(c, x, y, size, id, { t: opts.t || 0 }); return; }
+        A.drawHead(c, x, y, size, { face: id, turn: opts.turn == null ? 1 : opts.turn, t: opts.t || 0, shadow: false, dir: opts.dir }); return;
+      }
+    } catch (e) {}
+    safeDraw('drawHead', [c, x, y, size, { turn: opts.turn == null ? 1 : opts.turn, mood: id, t: opts.t || 0, shadow: false, dir: opts.dir }]);
+  }
+  function drawFaceLocked(c, x, y, size, id) {
+    var A = window.DARUMA_ART;
+    try { if (A && typeof A.drawFaceLocked === 'function') { A.drawFaceLocked(c, x, y, size, id); return; } } catch (e) {}
+    c.save(); c.fillStyle = 'rgba(255,255,255,0.16)'; c.beginPath(); c.arc(x, y, size * 0.42, 0, 6.283); c.fill();
+    c.font = '900 ' + Math.round(size * 0.45) + 'px ' + FONT; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = 'rgba(255,255,255,0.65)'; c.fillText('?', x, y + 1); c.restore();
+  }
+  var REACT_LINES = {
+    tsuntsun: ['なにすんの!', 'もー!', 'つつかないでよ〜', 'ぷんぷん!'], joy: ['えへへ、もっと〜♪', 'くすぐったい〜♪', 'つんつん すき♪'],
+    kusuguru: ['ひゃははは!', 'くすくす… やめて〜', 'こしょばい〜!'], uke: ['あはは! いまの もう1回 言って', 'ぶははっ!', 'お腹 いたい〜'],
+    flop: ['さむっ… お茶 ちょうだい', '……つまんない', 'しーん…'], bored: ['もう きかないよ〜', 'またそれ〜?'], demo: ['つんつん されると こっちを むくよ!']
+  };
+  function seeFace(id) { if (!id) return; if (!G.sessionFaces) G.sessionFaces = {}; G.sessionFaces[id] = true; }
+
   // ------------------------------------------------------------------ 画面の配置(design.md 1 章)
   var R = {
     pause: { x: 8, y: 4, w: 44, h: 44 }, sound: { x: 338, y: 4, w: 44, h: 44 },
@@ -49,7 +88,7 @@
     var st = null; try { st = JSON.parse(lsGet(C.STATS_KEY) || 'null'); } catch (e) {}
     st = st || {};
     return { best: +lsGet(C.BEST_KEY) || 0, bestDan: +lsGet(C.BEST_DAN_KEY) || 0, tutorialDone: lsGet(C.TUTORIAL_KEY) === '1',
-      stats: { plays: st.plays || 0, totalDan: st.totalDan || 0, faces: st.faces || [], titles: st.titles || [], dajareUke: st.dajareUke || 0, hengaoOK: st.hengaoOK || 0 } };
+      stats: { plays: st.plays || 0, totalDan: st.totalDan || 0, faces: st.faces || [], faceIds: st.faceIds || [], titles: st.titles || [], dajareUke: st.dajareUke || 0, hengaoOK: st.hengaoOK || 0 } };
   }
   // 保存場所の記録と 今の記録を合わせる(高いほう・多いほうを残す)。
   // ホーム画面のアプリと ブラウザなど 2か所で開いていると、古い画面が 低いベストで上書きしてしまうため(2026-11-14 ノブさん「最高得点が上がらない」)
@@ -57,7 +96,7 @@
     function uni(x, y) { var o = (x || []).slice(); (y || []).forEach(function (v) { if (o.indexOf(v) < 0) o.push(v); }); return o; }
     return { best: Math.max(a.best || 0, b.best || 0), bestDan: Math.max(a.bestDan || 0, b.bestDan || 0), tutorialDone: !!(a.tutorialDone || b.tutorialDone),
       stats: { plays: Math.max(a.stats.plays, b.stats.plays), totalDan: Math.max(a.stats.totalDan, b.stats.totalDan), faces: uni(a.stats.faces, b.stats.faces),
-        titles: uni(a.stats.titles, b.stats.titles), dajareUke: Math.max(a.stats.dajareUke, b.stats.dajareUke), hengaoOK: Math.max(a.stats.hengaoOK, b.stats.hengaoOK) } };
+        titles: uni(a.stats.titles, b.stats.titles), faceIds: uni(a.stats.faceIds, b.stats.faceIds), dajareUke: Math.max(a.stats.dajareUke, b.stats.dajareUke), hengaoOK: Math.max(a.stats.hengaoOK, b.stats.hengaoOK) } };
   }
   function refreshRecords() { G.rec = mergeRecords(loadRecords(), G.rec); }
   function saveRecords(r) {
@@ -96,7 +135,7 @@
 
   // ------------------------------------------------------------------ 画面の切り替え
   function show(id, on) { var el = $(id); if (el) el.classList.toggle('hidden', !on); }
-  function hideAll() { ['title', 'howto', 'pause', 'result'].forEach(function (id) { show(id, false); }); }
+  function hideAll() { ['title', 'howto', 'pause', 'result', 'zukan', 'faceModal'].forEach(function (id) { show(id, false); }); }
   function fmt(n) { return Math.round(n).toLocaleString('ja-JP'); }
 
   function toTitle() {
@@ -135,13 +174,13 @@
   function startGame(opts) {
     opts = opts || {};
     hideAll();
-    refreshRecords();
+    refreshRecords(); D.setFaces(faceList());
     var tutorial = opts.tutorial != null ? opts.tutorial : !G.rec.tutorialDone;
     var seed = opts.seed || ((Date.now() ^ (Math.random() * 1e9)) >>> 0);
     G.S = D.newGame({ seed: seed, tutorial: tutorial, firstPlay: G.rec.stats.plays === 0, daily: G.daily.mood });
     G.mode = 'play'; G.paused = false; G.countdown = 0; G.acc = 0;
     G.fx = []; G.flyers = []; G.texts = []; G.bubble = null; G.pbubble = null; G.tip = null; G.flash = 0; G.shake = 0; G.fall = 0;
-    G.chantAt = []; G.faceOver = null; G.outInfo = null; G.tapX = null; G.comboEnd = 0;
+    G.chantAt = []; G.faceOver = null; G.sessionFaces = {}; G.faceTag = null; G.outInfo = null; G.tapX = null; G.comboEnd = 0;
     if (tutorial) { say('れんしゅう だよ!むこうを むいたら トン!', 3); }
     AUDIO.bgm('play');
   }
@@ -205,7 +244,14 @@
           if (e.k === 'SAFE' && e.ph.say === 'なんちゃって') { say('…なんちゃって!', 1.0, '#ffe0f0'); sfx('laugh'); }
           if (e.k === 'WARN') { if (e.ph.dbl) say('…だっ!', 0.8, '#ffd0d0'); if (S.d.mood === 'bikkuri' && !e.ph.dbl) say(S.d.wakeUp ? 'はっ!ねてない!' : '!?', 0.9, '#fff3a0'); }
           if (e.k === 'GRACE' && !blind) sfx('turn');
-          if (e.k === 'WATCH') {
+          if (e.k === 'WATCH' && e.ph.react && !blind) {
+            var fobj = faceById(e.ph.face), lines = REACT_LINES[e.ph.react] || REACT_LINES.tsuntsun;
+            seeFace(e.ph.face);
+            G.faceTag = { name: fobj ? fobj.name : '', until: G.at + 1.3 };
+            say((fobj && fobj.line) || lines[Math.floor(G.lastRng() * lines.length)], 1.4, e.ph.react === 'tsuntsun' || e.ph.react === 'flop' ? '#ffd8cc' : '#fffaf0');
+            sfx(e.ph.react === 'tsuntsun' ? 'angry' : e.ph.react === 'flop' || e.ph.react === 'bored' ? 'flop' : 'laugh');
+          } else if (e.k === 'WATCH') {
+            if (!blind) seeFace(faceIdOfArt(D.MOODS[S.d.mood].art));
             if (!blind) { G.flash = 1; G.flashCol = '255,40,40'; G.shake = 0.35; floatText(HEAD.x + 104, 196, 'じーっ', '#ff4040', 24, 0.8); if (S.tutorial) say('見てるよ〜 さわらないでね', 1.4); }
             else { G.blindWatches = (G.blindWatches || 0) + 1; say(G.blindWatches >= 2 && G.lastRng() < 0.6 ? 'むむっ…木の においが する…!' : 'あれ?見えないよ〜', 1.6, '#e6dcff'); }
           }
@@ -261,12 +307,14 @@
         case 'shield':
           sfx('shield'); say('あれ?気のせいかな〜?', 1.8, '#e6dcff'); burst(195, 240, '#d8f4ff', 30, 240); G.flash = 0.6; G.flashCol = '200,240,255';
           break;
+        case 'react': break;
+        case 'reactDemo': tip('react', 'ちょっかいを すると こっちを むくよ。そのあいだは トン!しないで'); break;
         case 'out': onOut(); break;
         case 'tutorialDone':
           sfx('best'); say('じょうず!ほんばん いくよ!', 2.2, '#fff3a0'); G.rec.tutorialDone = true; saveRecords(G.rec);
           break;
         case 'newFace': break;
-        case 'peek': sfx('shy'); G.peekText = floatText(HEAD.x - 92, (G.headY || 230) - 52, 'ちらっ', '#ff9ad0', 18, 0.8); break;
+        case 'peek': seeFace(faceIdOfArt('shy')); sfx('shy'); G.peekText = floatText(HEAD.x - 92, (G.headY || 230) - 52, 'ちらっ', '#ff9ad0', 18, 0.8); break;
         case 'peekCaught': sfx('warn'); faceOverride('suspicious', 1.3); say('ん?', 1.2, '#fff3a0'); break;
         case 'mysteryOpen': G.mystery = { t0: G.at, result: null }; sfx('item'); break;
         case 'mysteryResult':
@@ -299,6 +347,7 @@
     if (b.t === 'kin') burst(195, 498, '#fff0a0', 16, 220);
   }
   function onOut() {
+    seeFace(faceIdOfArt(G.S.out.mood === 'okori' ? 'angry' : 'smug'));
     var S = G.S;
     sfx('out'); AUDIO.bgm(null);
     G.mode = 'out'; G.outT = 0; G.flash = 1; G.flashCol = '255,0,0'; G.shake = 0.6;
@@ -315,6 +364,10 @@
     r.stats.plays++; r.stats.totalDan += st.dan;
     r.stats.dajareUke += st.counts.dajareUke; r.stats.hengaoOK += st.counts.hengaoOK;
     st.seen.forEach(function (f) { if (r.stats.faces.indexOf(f) < 0) r.stats.faces.push(f); });
+    if (!r.stats.faceIds) r.stats.faceIds = [];
+    var newFaces = Object.keys(G.sessionFaces || {}).filter(function (id) { return r.stats.faceIds.indexOf(id) < 0; });
+    newFaces.forEach(function (id) { r.stats.faceIds.push(id); });
+    G.newFaces = {}; newFaces.forEach(function (id) { G.newFaces[id] = true; });
     var got = D.titlesFor(st, r.stats), news = got.filter(function (id) { return r.stats.titles.indexOf(id) < 0; });
     news.forEach(function (id) { r.stats.titles.push(id); });
     saveRecords(r);
@@ -340,7 +393,9 @@
     var showT = news.length ? tl.filter(function (x) { return news.indexOf(x.id) >= 0; }) : tl.slice(-1);
     $('rTitle').textContent = news.length ? '称号: ' + showT.map(function (x) { return x.name; }).join('・') + ' (NEW)' : (nextT ? 'つぎの称号: ' + nextT.name + '(' + nextT.how + ')' : '称号を ぜんぶ とったよ!');
     $('rNext').textContent = '';
-    $('rFaces').textContent = '見たかお ' + r.stats.faces.length + ' / ' + D.FACE_KEYS.length;
+    $('rFaces').textContent = '見たかお ' + countSeen() + ' / ' + faceList().length + (newFaces.length ? '   NEW ' + newFaces.length : '');
+    $('rGridBox').scrollTop = 0;
+    setTimeout(function () { renderGrid($('rGrid'), G.newFaces); }, 30);
     if (isBest) sfx('best');
     AUDIO.bgm('result');
   }
@@ -370,15 +425,13 @@
     }
     var mood0 = S.d.mood, evs = D.useChotto(S, name, t) || [];
     evs.forEach(function (e) {
-      if (e.type === 'tickle') { sfx('laugh'); faceOverride('laugh', 0.9); psay('こちょこちょ〜', 1); if (e.warn) setTimeout(function () { say('くすくす…でも 見るよ', 1.2); }, 850); }
-      if (e.type === 'bored') { sfx('flop'); psay(name === 'dajare' ? e.joke : 'こちょこちょ〜', 1.2); say('もう きかないよ〜', 1.6, '#e6dcff'); }
+      if (e.type === 'tickle') { psay('こちょこちょ〜', 1); }
+      if (e.type === 'bored') { psay(name === 'dajare' ? e.joke : 'こちょこちょ〜', 1.2); }
       if (e.type === 'dajare') {
         psay(e.joke, 2.2); sfx('joke');
-        if (e.uke) { setTimeout(function () { sfx('laugh'); }, 300); faceOverride('laugh', 1.5); setTimeout(function () { say('…いまの もう1回 言って', 1.6); }, 1500); }
-        else if (e.sleep) say('zzz…', 1.4);
-        else { setTimeout(function () { sfx('flop'); }, 300); say('さむっ… お茶 ちょうだい', 1.8, '#d8ecff'); }
+
       }
-      if (e.type === 'tease') { sfx('angry'); psay('つんつん', 0.9); tip('nakanaori', 'なかなおりは「ほめる」か「お茶」で'); say(e.cry ? 'ひどい…ぐすっ' : 'むかーっ!', 1.4, e.cry ? '#d8f4ff' : '#ffd0c8'); G.shake = 0.2; }
+      if (e.type === 'tease') { sfx('angry'); psay('つんつん', 0.9); tip('nakanaori', 'なかなおりは「ほめる」か「お茶」で'); G.shake = 0.2; }
     });
     if (mood0 !== S.d.mood) moodBgm();
   }
@@ -474,6 +527,9 @@
   function onPlayButton(ev) { fullscreen(ev); sfx('ok'); if (!G.rec.tutorialDone && G.rec.stats.plays === 0) toHowto(); else startGame(); }
   bindBtn('btnPlay', onPlayButton);
   bindBtn('btnHow', function () { sfx('tap'); toHowto(); });
+  bindBtn('btnZukan', function () { sfx('tap'); toZukan(); });
+  bindBtn('btnZBack', function () { sfx('tap'); show('zukan', false); show('title', true); });
+  bindBtn('btnFmClose', function () { show('faceModal', false); });
   bindBtn('tSound', toggleSound);
   bindBtn('pSound', toggleSound);
   bindBtn('btnNext', howtoNext);
@@ -564,7 +620,9 @@
     if (mood === 'gekido' && shake < 0.45) shake = 0.45;   // げきおこ: ぷるぷる ふるえる
     if (G.faceOver && G.at < G.faceOver.until) art = G.faceOver.mood;
     if (blind) art = 'blind';
-    return { turn: turn, shake: shake, mood: art, look: look, k: k, blind: blind };
+    var face = (k === 'WATCH' || k === 'RETURN' || k === 'GRACE') && ph && ph.react && ph.face && !blind ? ph.face : (k === 'RETURN' && ph && ph.react ? null : null);
+    if (!face && ph && ph.react && (k === 'GRACE' || k === 'RETURN')) { var nx = S.d.ph[S.d.ph.indexOf(ph) + (k === 'GRACE' ? 1 : -1)]; if (nx && nx.face && !blind) face = nx.face; }
+    return { turn: turn, shake: shake, mood: art, look: look, k: k, blind: blind, face: face };
   }
 
   // ------------------------------------------------------------------ 描画(遊んでいる画面)
@@ -606,7 +664,13 @@
     if (pose.k === 'PERFECT' || G.mode === 'out') { /* そのまま */ }
     var peeking = S.peek && t >= S.peek.s && t < S.peek.e && pose.k === 'SAFE';
     var hopts = { turn: opt.turn != null ? opt.turn : pose.turn, mood: opt.mood || pose.mood, t: G.at, shake: pose.shake, dir: peeking ? -1 : 1 };
-    safeDraw('drawHead', [ctx, HEAD.x, hy, size, hopts]);
+    if (pose.face && !opt.mood) drawFaceById(ctx, HEAD.x, hy, size, pose.face, { turn: hopts.turn, t: G.at, dir: 1 });
+    else safeDraw('drawHead', [ctx, HEAD.x, hy, size, hopts]);
+    if (pose.face && G.faceTag && G.at < G.faceTag.until && G.faceTag.name) {   // 反応の顔の名前
+      var ty = Math.max(156, hy - 74);
+      ctx.save(); ctx.fillStyle = 'rgba(255,240,200,0.96)'; rr(70, ty - 16, 124, 32, 10); ctx.fill(); ctx.strokeStyle = '#c08a20'; ctx.lineWidth = 2; ctx.stroke(); ctx.restore();
+      text(G.faceTag.name + '!', 132, ty + 1, 18, '#7a4a00', 'center', 900);
+    }
     G.headY = hy;
     if (G.mode === 'play' && hopts.turn < 0.6 && !pose.blind) drawBackSign(S.d.mood, hy);
     if (pose.k === 'PERFECT') drawButterfly(hy);
@@ -770,6 +834,7 @@
       var col = done ? (red ? (blind ? '#8a5ad8' : '#e02020') : '#1b1430') : 'rgba(27,20,48,0.22)';
       text(C.CHANT[i], x, 117, size, col, 'center', 900);
     }
+    if (ph && ph.react && (k === 'WARN' || k === 'GRACE' || k === 'WATCH')) text('!?', 195, 117, 34, blind ? '#8a5ad8' : '#e02020', 'center', 900, '#fffaf0', 6);
     if (ph && ph.dbl) text('…だっ!', 195, 117, 34, blind ? '#8a5ad8' : '#e02020', 'center', 900, '#fffaf0', 6);
     ctx.restore();
   }
@@ -812,13 +877,15 @@
   // 左の列: 予兆の大きい「ころんだ」/ この向こう向きで落とした数・コンボ / 効いているもの
   function drawLeftColumn(S, t) {
     var ph = D.phaseAt(S.d, t), k = ph ? ph.k : 'SAFE', blind = D.isBlind(S, t);
-    if ((k === 'WARN' || k === 'FEINT' || k === 'GRACE' || k === 'WATCH') && !(ph && ph.dbl)) {
+    if ((k === 'WARN' || k === 'FEINT' || k === 'GRACE' || k === 'WATCH') && !(ph && ph.dbl) && !(ph && ph.react)) {
       var said = D.chantIndex(S.d, t), col = blind ? '#9a6af0' : '#ff2a2a';
       for (var i = 6; i < 10; i++) {
         if (said <= i) break;
         var at = G.chantAt[i], pop = at != null ? Math.max(0, 1 - (G.at - at) / 0.2) : 0;
         text(C.CHANT[i], 46, 192 + (i - 6) * 46, 44 * (1 + 0.5 * pop), col, 'center', 900, '#ffffff', 7);
       }
+    } else if (ph && ph.react && (k === 'WARN' || k === 'GRACE')) {
+      text('!?', 46, 230, 48, blind ? '#9a6af0' : '#ff2a2a', 'center', 900, '#ffffff', 7);
     } else if (ph && ph.dbl) {
       text('だっ!', 46, 230, 40, blind ? '#9a6af0' : '#ff2a2a', 'center', 900, '#ffffff', 7);
     } else if (S.windowDrops > 0) {
@@ -1149,15 +1216,46 @@
     var r = G.result;
     safeDraw('drawBackground', [ctx, W, H * 0.95, G.at, 'yoru']);
     ctx.save(); ctx.fillStyle = 'rgba(20,12,42,0.55)'; ctx.fillRect(-200, -200, W + 400, H + 400); ctx.restore();
-    safeDraw('drawHead', [ctx, 195, 92, 120, { turn: 1, mood: r.face, t: G.at, oneEye: r.oneEye }]);
-    // 見たかお(9つ)
-    var faces = G.rec.stats.faces;
-    for (var i = 0; i < D.FACE_KEYS.length; i++) {
-      var key = D.FACE_KEYS[i], x = 195 + (i - (D.FACE_KEYS.length - 1) / 2) * 34, y = 528, seen = faces.indexOf(key) >= 0;
-      if (seen) safeDraw('drawHead', [ctx, x, y, 30, { turn: 1, mood: key === 'mekakushi' ? 'blind' : D.MOODS[key].art, t: 0, shadow: false }]);
-      else { ctx.save(); ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.beginPath(); ctx.arc(x, y, 14, 0, 6.283); ctx.fill(); ctx.restore(); text('?', x, y + 1, 14, 'rgba(255,255,255,0.6)', 'center', 900); }
+    safeDraw('drawHead', [ctx, 195, 50, 80, { turn: 1, mood: r.face, t: G.at, oneEye: r.oneEye }]);
+  }
+
+  // ------------------------------------------------------------------ かお図鑑(10×10 の一覧。HTML の canvas に1回だけ描く)
+  var GRID_COLS = 10, GRID_CELL = 39;
+  function countSeen() { var seen = G.rec.stats.faceIds || [], n = 0; faceList().forEach(function (f) { if (seen.indexOf(f.id) >= 0) n++; }); return n; }
+  function renderGrid(cv2, newSet) {
+    if (!cv2) return;
+    var L = faceList(), rows = Math.ceil(L.length / GRID_COLS), w = GRID_COLS * GRID_CELL, h = rows * GRID_CELL;
+    var sc = Math.max(1.5, Math.min(4, VIEW.s * VIEW.dpr));
+    cv2.width = Math.round(w * sc); cv2.height = Math.round(h * sc); cv2.style.width = w + 'px'; cv2.style.height = h + 'px';
+    var c = cv2.getContext('2d'); c.setTransform(sc, 0, 0, sc, 0, 0); c.clearRect(0, 0, w, h);
+    var seen = G.rec.stats.faceIds || [];
+    for (var i = 0; i < L.length; i++) {
+      var f = L[i], x = (i % GRID_COLS + 0.5) * GRID_CELL, y = (Math.floor(i / GRID_COLS) + 0.5) * GRID_CELL;
+      if (seen.indexOf(f.id) >= 0) {
+        if (newSet && newSet[f.id]) { c.save(); c.fillStyle = 'rgba(255,224,102,0.35)'; c.beginPath(); c.arc(x, y, GRID_CELL * 0.48, 0, 6.283); c.fill(); c.restore(); }
+        drawFaceById(c, x, y + 1, GRID_CELL * 0.8, f.id, {});
+        if (newSet && newSet[f.id]) {
+          c.save(); c.font = '900 10px ' + FONT; c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineWidth = 3; c.strokeStyle = '#1b1430'; c.strokeText('NEW', x, y - GRID_CELL * 0.38); c.fillStyle = '#ff5a5a'; c.fillText('NEW', x, y - GRID_CELL * 0.38);
+          c.fillStyle = '#fff6a0'; c.beginPath(); var sx = x + GRID_CELL * 0.36, sy = y - GRID_CELL * 0.3; for (var k = 0; k < 8; k++) { var a = k * Math.PI / 4, rr2 = k % 2 ? 2 : 6; c.lineTo(sx + Math.cos(a) * rr2, sy + Math.sin(a) * rr2); } c.closePath(); c.fill(); c.restore();
+        }
+      } else drawFaceLocked(c, x, y, GRID_CELL * 0.8, f.id);
     }
   }
+  function gridTap(ev, cv2) {
+    var r = cv2.getBoundingClientRect(), L = faceList();
+    var col = Math.floor((ev.clientX - r.left) / r.width * GRID_COLS), row = Math.floor((ev.clientY - r.top) / r.height * Math.ceil(L.length / GRID_COLS));
+    var i = row * GRID_COLS + col, f = L[i]; if (!f) return;
+    var seen = (G.rec.stats.faceIds || []).indexOf(f.id) >= 0;
+    var fc = $('fmCanvas'), c = fc.getContext('2d'); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, fc.width, fc.height);
+    if (seen) drawFaceById(c, 200, 205, 330, f.id, { t: G.at }); else drawFaceLocked(c, 200, 200, 330, f.id);
+    $('fmName').textContent = seen ? f.name : '?????';
+    $('fmGroup').textContent = seen ? ({ tsuntsun: 'つんつん の かお', dajare: 'ダジャレ の かお', kusuguru: 'くすぐる の かお', common: 'いつもの かお', rare: 'めずらしい かお!' }[f.group] || '') : 'まだ 見ていない かお';
+    show('faceModal', true); sfx('tap');
+  }
+  $('rGrid').addEventListener('click', function (ev) { gridTap(ev, $('rGrid')); });
+  $('zGrid').addEventListener('click', function (ev) { gridTap(ev, $('zGrid')); });
+  $('faceModal').addEventListener('click', function () { show('faceModal', false); });
+  function toZukan() { refreshRecords(); show('title', false); show('zukan', true); $('zCount').textContent = '見たかお ' + countSeen() + ' / ' + faceList().length; $('zGridBox').scrollTop = 0; setTimeout(function () { renderGrid($('zGrid'), null); }, 30); }
 
   // ------------------------------------------------------------------ ループ(固定 1/60 秒)
   function update(dt) {
