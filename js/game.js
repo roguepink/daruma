@@ -229,7 +229,7 @@
           else tip('slide', '▲が まんなかに 来たら トン!');
           break;
         case 'tooFast': G.swing = 1; sfx('tap'); break;
-        case 'tama': floatText(110, 58, 'ちょっかい玉 +1', '#ffe066', 18, 1.2); tip('tama', 'ちょっかいを つかってみよう!(下の3つ)'); break;
+        case 'tama': floatText(46, 340, '玉 +1', '#ffe066', 20, 1.2); tip('tama', 'ちょっかいを つかってみよう!(下の3つ)'); break;
         case 'item':
           sfx('item'); floatText(300, 360, D.ITEMS[e.item].name + ' ゲット!', '#fff3a0', 20, 1.4);
           tip('item', e.item === 'shield' ? 'まもり:1回だけ 見つかっても セーフ!' : 'アイテムを ためしてみて!(右の わく)');
@@ -237,7 +237,8 @@
         case 'itemPoints': floatText(300, 360, '+100', '#fff3a0', 22, 1); break;
         case 'bomb':
           sfx('angry'); burst(195, 480, '#ffb020', 26, 260); burst(195, 480, '#555', 14, 200); G.shake = 0.5; G.flash = 0.7; G.flashCol = '255,200,80';
-          floatText(195, 450, 'ドカーン!', '#ffb020', 34, 0.9);
+          if (G.ptsText) { var bi = G.texts.indexOf(G.ptsText); if (bi >= 0) G.texts.splice(bi, 1); }
+          G.ptsText = floatText(250, 474, 'ドカーン!', '#ffb020', 30, 0.9);
           tip('bomb', 'ばくだんを おとすと びっくりして ふりむくよ!');
           break;
         case 'bombDud': floatText(195, 460, 'ポン', '#ccc', 22, 0.6); break;
@@ -267,11 +268,11 @@
       else { G.perfText = floatText(250, 470, 'むてき +' + fmt(S.perfPts || 0), '#ffe066', 24, 1.0); }
     } else {
       if (G.ptsText) { var ix = G.texts.indexOf(G.ptsText); if (ix >= 0) G.texts.splice(ix, 1); }
-      G.ptsText = floatText(250, 474, '+' + fmt(e.pts), hex, e.pts >= 100 ? 28 : 24, 0.8);
+      G.ptsText = floatText(250, 474, '+' + fmt(e.pts) + (e.squeeze ? ' すべりこみ!' : ''), e.squeeze ? '#ff7070' : hex, e.pts >= 100 ? 26 : 24, 0.8);
     }
     G.scoreBump = 1;
-    if (e.squeeze) { floatText(195, 440, 'すべりこみ!あぶない!', '#ff7070', 22, 0.9); tip('squeeze', '赤い字の間に落とすと 1.5倍。でも こわいよ'); }
-    if (e.combo && e.combo % 5 === 0) { sfx('combo'); floatText(195, 404, e.combo + 'コンボ!', '#ffe066', 30, 1.0); }
+    if (e.squeeze) tip('squeeze', '赤い字の間に落とすと 1.5倍。でも こわいよ');
+    if (e.combo && e.combo % 5 === 0) { sfx('combo'); G.comboPop = G.at; }
     if (b.t === 'kin') burst(195, 498, '#fff0a0', 16, 220);
   }
   function onOut() {
@@ -526,6 +527,7 @@
     else if (k === 'WATCH') turn = 1;
     else if (k === 'RETURN') turn = 1 - p;
     else if (k === 'PERFECT') { art = 'laugh'; }
+    else if (midWarn(S, t)) { turn = 0.35; }
     if (k === 'FROZEN' && ph.say && /あはは|くすくす/.test(ph.say)) art = 'laugh';
     if (G.faceOver && G.at < G.faceOver.until) art = G.faceOver.mood;
     if (blind) art = 'blind';
@@ -559,6 +561,7 @@
       if (bb.kind === 'slide') drawSlideMarker(bb, it.cy, S.t);
       if (bb.kind === 'ring') drawRing(bb, it.cy, S.t);
       if (bb.kind === 'double') text('×2', 130, it.cy + 2, 18, '#ffffff', 'center', 900, '#1b1430', 4);
+      if (bb.t === 'bakudan') drawFuse(it.cy);
       // 段の点数(色ごとに ちがう)
       text(String(D.BLOCKS[bb.t].pts), 284, it.cy + 2, 16, '#ffffff', 'right', 900, '#1b1430', 4);
       if (it.i === 0) drawBottomMark(bb, it.cy, it.h);
@@ -582,6 +585,17 @@
       ctx.restore();
     }
     return { headY: hy, topY: topY };
+  }
+  function drawFuse(cy) {
+    ctx.save();
+    ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(98, cy - 4); ctx.quadraticCurveTo(84, cy - 8, 82, cy - 20); ctx.stroke();
+    var f = 0.6 + 0.4 * Math.sin(G.at * 23), x = 82, y = cy - 22;
+    ctx.fillStyle = 'rgba(255,170,40,0.9)'; ctx.beginPath(); ctx.arc(x, y, 7 * f, 0, 6.283); ctx.fill();
+    ctx.fillStyle = '#fff6a0'; ctx.beginPath(); ctx.arc(x, y, 3.5 * f, 0, 6.283); ctx.fill();
+    ctx.strokeStyle = '#ffd040'; ctx.lineWidth = 2;
+    for (var i = 0; i < 4; i++) { var a = G.at * 9 + i * 1.57; ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * 6, y + Math.sin(a) * 6); ctx.lineTo(x + Math.cos(a) * 11, y + Math.sin(a) * 11); ctx.stroke(); }
+    ctx.restore();
   }
   function dangerNow(S, t) { var k = D.kindAt(S.d, t); return (k === 'WARN' || k === 'FEINT' || k === 'GRACE' || k === 'WATCH') && !D.isBlind(S, t); }
   function drawSlideMarker(b, cy, t) {
@@ -616,7 +630,7 @@
     ctx.restore();
     if (b.kind === 'mash' || b.kind === 'mochi' || b.kind === 'double' || b.kind === 'hibi') text('あと' + b.hp + '回', 140, cy + 1, 16, '#ffffff', 'center', 900, '#1b1430', 4);
     if ((b.kind === 'ring' && D.ringInfo(b, S.t).dist <= D.ringWindow(S)) || (b.kind === 'slide' && D.slideInfo(b, S.t).dist <= C.SLIDE_WINDOW)) {
-      if (!dangerNow(S, S.t)) text('いま!', 252, cy - 1, 17, '#40ff70', 'center', 900, '#1b1430', 4);
+      if (!dangerNow(S, S.t)) text('いま!', 138, cy - 1, 17, '#40ff70', 'center', 900, '#1b1430', 4);
     }
   }
   // 後ろ姿でも 気分が分かる しるし
@@ -742,7 +756,8 @@
       text('この間', 46, 200, 16, '#ffffff', 'center', 900, '#1b1430', 4);
       text(S.windowDrops + 'こ', 46, 232, 32, '#9be15d', 'center', 900, '#1b1430', 6);
       if (S.combo >= 2) {
-        text(S.combo + 'コンボ', 46, 272, 18, '#ffe066', 'center', 900, '#1b1430', 4);
+        var cp = G.comboPop != null ? Math.max(0, 1 - (G.at - G.comboPop) / 0.4) : 0;
+        text(S.combo + 'コンボ', 46, 272, 18 * (1 + 0.5 * cp), '#ffe066', 'center', 900, '#1b1430', 4);
         text('×' + D.comboMul(S.combo).toFixed(1), 46, 294, 18, '#ffe066', 'center', 900, '#1b1430', 4);
       }
     }
@@ -820,9 +835,18 @@
       ctx.restore();
     }
   }
+  // 予兆の途中で止まっている(くすぐり・時間止め など)か: 前も後ろも予兆
+  function midWarn(S, t) {
+    var ph = S.d.ph, i;
+    for (i = ph.length - 1; i >= 0; i--) if (ph[i].s <= t) break;
+    if (i < 1 || i >= ph.length - 1) return false;
+    var k = ph[i].k;
+    return (k === 'FROZEN' || k === 'STOP' || k === 'PAUSE') && ph[i - 1].k === 'WARN' && ph[i + 1].k === 'WARN';
+  }
   function tonState(S, t) {
     if (G.countdown > 0) return 'wait';
     var k = D.kindAt(S.d, t), blind = D.isBlind(S, t);
+    if (midWarn(S, t)) return blind ? 'blind' : 'warn';
     if (k === 'PERFECT') return 'perfect';
     if (D.isDanger(k) || k === 'FEINT') {
       if (blind) return 'blind';
@@ -910,7 +934,13 @@
     // 変顔(にらめっこ): 見ている間だけ、顔をタッチ
     if (D.canUseChotto(S, 'hengao', S.t)) {
       var p2 = 0.5 + 0.5 * Math.sin(G.at * Math.PI * 2 * PULSE);
-      text('顔を タッチで にらめっこ!', 195, Math.max(153, headY - 84), 17, '#ffd0f0', 'center', 900, '#1b1430', 4);
+      var wph = D.phaseAt(S.d, S.t);
+      if (wph && G.hengaoHintPh !== wph) { G.hengaoHintPh = wph; G.hengaoHints = (G.hengaoHints || 0) + 1; }
+      if ((G.hengaoHints || 0) <= 3) {
+        var ty = Math.max(156, headY - 74);
+        ctx.save(); ctx.fillStyle = 'rgba(255,224,240,0.95)'; rr(80, ty - 15, 104, 30, 10); ctx.fill(); ctx.strokeStyle = '#c0408a'; ctx.lineWidth = 2; ctx.stroke(); ctx.restore();
+        text('顔タッチ', 132, ty + 1, 17, '#a0206a', 'center', 900);
+      }
       ctx.save(); ctx.strokeStyle = 'rgba(255,170,220,' + (0.5 + 0.4 * p2) + ')'; ctx.lineWidth = 3; ctx.setLineDash([8, 6]);
       ctx.beginPath(); ctx.arc(HEAD.x, headY, 84, 0, 6.283); ctx.stroke(); ctx.restore();
     }

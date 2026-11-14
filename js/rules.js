@@ -97,7 +97,7 @@
   ];
   var TUTORIAL_WEIGHTS = { aka: 60, ao: 25, midori: 15 };
 
-  var ITEM_POOL = { mekakushi: 20, ocha: 12, odateru: 8, komoriuta: 8, shield: 6, kizuchi: 12, bai: 12, tokei: 8, perfect: 10 };
+  var ITEM_POOL = { mekakushi: 30, ocha: 12, odateru: 8, komoriuta: 8, shield: 6, kizuchi: 12, bai: 12, tokei: 8, perfect: 10 };
   var ITEMS = {
     mekakushi: { name: '目かくし',   short: '目かくし', art: 'blindfold', mark: '目', color: '#4a5fc0', desc: '5びょう 見えなくなる' },
     ocha:      { name: 'お茶',       short: 'お茶',   art: null, mark: '茶', color: '#3f8f4a', desc: 'きぶんが おちつく' },
@@ -615,7 +615,7 @@
     if (b.t === 'kin') { S.counts.gold++; S.goldWin = true; }
     if (b.t === 'niji') {
       S.bst.rainbows++;
-      var it = (S.firstPlay && S.bst.rainbows === 2) ? 'perfect' : wpick(S.rng, ITEM_POOL);
+      var it = (S.firstPlay && S.bst.rainbows === 2) ? 'perfect' : S.bst.rainbows === 1 ? 'mekakushi' : wpick(S.rng, ITEM_POOL);
       if (S.tutorial) it = 'mekakushi';
       addItem(S, it, ev);
     }
