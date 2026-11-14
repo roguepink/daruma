@@ -51,10 +51,10 @@
     KOROBI_P: 0.04, KOROBI_P_SLEEPY: 0.08, KOROBI_SEC: 2.5, KOROBI_UP: 0.5,       // ほんとうに ころんだ
     GIRIGIRI_SEC: 0.15, GIRIGIRI_BONUS: 50,                                     // ギリギリセーフ
     KIN_EVERY: 50, KIN_CYCLES: 3,                                               // 金だるま(使っていない)
-    GOLDEN_P: 0.20, GOLDEN_P_AGAIN: 0.08, GOLDEN_SEC: 9, GOLDEN_TAP: 0.065, GOLDEN_DECAY: 0.04, GOLDEN_POINTS: 300, GOLDEN_SPEED_BONUS: 25, GOLDEN_SPEED_MAX: 200, GOLDEN_FLOP_POINTS: 50, GOLDEN_FLOP_MAX: 250, GOLDEN_AFTER: 1.5,   // ゴールデンだるま
+    GOLDEN_P: 0.20, GOLDEN_P_AGAIN: 0.08, GOLDEN_SEC: 9, GOLDEN_TAP: 0.065, GOLDEN_DECAY: 0.04, GOLDEN_IDLE_SEC: 2, GOLDEN_IDLE_DECAY: 0.20, GOLDEN_POINTS: 300, GOLDEN_SPEED_BONUS: 25, GOLDEN_SPEED_MAX: 200, GOLDEN_FLOP_POINTS: 50, GOLDEN_FLOP_MAX: 250, GOLDEN_AFTER: 1.5,   // ゴールデンだるま
     BOUSAN_P: 0.08, SAISEN_WISH: 5, RENDA_TITLE: 15, IPPO_DROPS: 3,
     REACT_PRE: 0.60, REACT_GRACE: 0.25,   // 「!?」+ 猶予 = 0.85 秒(ふつうの予兆と同じくらい。ちょっかいが 損に なりすぎないように)
-    REACT_WATCH: 0.8, REACT_SAFE_MIN: 2.5, REACT_DEMO_PRE: 1.0, TSUNTSUN_JOY_P: 0.15, FACE_COMMON_P: 0.10, FACE_RARE_P: 0.025,
+    REACT_WATCH: 0.8, REACT_SAFE_MIN: 3.5, REACT_DEMO_PRE: 1.0, TSUNTSUN_JOY_P: 0.15, FACE_COMMON_P: 0.10, FACE_RARE_P: 0.025,
     MYSTERY_REVEAL: 1.0, MUTEKI_SEC: 5, GEKIDO_SEC: [8, 10], MYSTERY_MUTEKI_P: 0.5,
     PERFECT_SEC: 5, PERFECT_DROP_RATE: 3.5, PERFECT_TAP_DROPS: 2, HENGAO_COOLDOWN: 12, TICKLE_MOOD_CYCLES: 1, TIMESTOP_SEC: 3, DOUBLE_SCORE_SEC: 10, GOLD_MALLET_HITS: 6,
     // 演出
@@ -696,12 +696,13 @@
     // ゴールデンだるま: 出ている間は 本体は 振り向かない(GOLDEN の区間)。トン! で ふくらむ
     if (S.goldenAt && t1 >= S.goldenAt && !S.golden) {
       S.goldenAt = 0; S.goldenCount = (S.goldenCount || 0) + 1;
-      S.golden = { s: t1, e: t1 + CONFIG.GOLDEN_SEC, inflate: 0, taps: 0 };
+      S.golden = { s: t1, e: t1 + CONFIG.GOLDEN_SEC, inflate: 0, taps: 0, last: t1 };
       rebuild(S, t1, { sec: 9999, kind: 'GOLDEN' }, 0);
       ev.push({ type: 'goldenStart' });
     }
     if (S.golden) {
-      S.golden.inflate = Math.max(0, S.golden.inflate - CONFIG.GOLDEN_DECAY * dt);
+      var idle = t1 - S.golden.last > CONFIG.GOLDEN_IDLE_SEC;   // 連打を 2秒 止めると 早く しぼむ(サボると ぷしゅ〜)
+      S.golden.inflate = Math.max(0, S.golden.inflate - (idle ? CONFIG.GOLDEN_IDLE_DECAY : CONFIG.GOLDEN_DECAY) * dt);
       if (t1 >= S.golden.e) { var fpts = CONFIG.GOLDEN_FLOP_POINTS + Math.round(CONFIG.GOLDEN_FLOP_MAX * S.golden.inflate); S.score += fpts; ev.push({ type: 'goldenFlop', pts: fpts, inflate: S.golden.inflate }); endGolden(S, t1); }   // がんばった分は もらえる
     }
     // ミステリーボックスが 開いた
@@ -809,7 +810,7 @@
     S.lastHitAt = t;
     var ph = phaseAt(S.d, t), k = ph ? ph.k : 'SAFE';
     if (S.golden) {
-      var gd = S.golden; gd.taps++; gd.inflate = Math.min(1, gd.inflate + CONFIG.GOLDEN_TAP);
+      var gd = S.golden; gd.taps++; gd.last = t; gd.inflate = Math.min(1, gd.inflate + CONFIG.GOLDEN_TAP);
       if (gd.inflate >= 1) {
         var rate = gd.taps / Math.max(0.5, t - gd.s), pts = CONFIG.GOLDEN_POINTS + Math.min(CONFIG.GOLDEN_SPEED_MAX, Math.round(rate * CONFIG.GOLDEN_SPEED_BONUS));
         S.score += pts; S.counts.goldenPop = (S.counts.goldenPop || 0) + 1;
@@ -845,7 +846,7 @@
     var b = S.tower[0], power = 1;
     if (S.malletHits > 0) { power = 3; S.malletHits--; }
     var res = hitBlock(b, t, power, { ring: ringWindow(S) });
-    if (res === 'drop') return ev.concat(dropBlock(S, t, { squeeze: k === 'WARN' && !isBlind(S, t) }));   // チラ見の「ん?」も いっしょに返す
+    if (res === 'drop') return ev.concat(dropBlock(S, t, { squeeze: k === 'WARN' && !isBlind(S, t) && !(ph && ph.react) }));   // 反応の「!?」では すべりこみに しない   // チラ見の「ん?」も いっしょに返す
     if (res === 'miss') { S.combo = 0; ev.push({ type: 'miss', block: b }); return ev; }
     ev.push({ type: 'damage', block: b, power: power });
     return ev;

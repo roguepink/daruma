@@ -842,10 +842,10 @@
       ctx.fillStyle = left < 0.3 ? '#ff6a4a' : '#8fd0ff'; rr(19, 601, Math.max(10, 352 * left), 18, 8); ctx.fill(); ctx.restore();
       text('のこり ' + secs + 'びょう', 195, 610, 17, '#ffffff', 'center', 900, '#1b1430', 4);
       // ふくらみメーター(満タンで 弾ける)
-      ctx.save(); ctx.fillStyle = 'rgba(20,12,42,0.85)'; rr(10, 150, 30, 300, 12); ctx.fill();
-      var mh = 292 * v.inflate; ctx.fillStyle = v.inflate > 0.8 ? '#ff7a3a' : '#ffd84a'; rr(14, 446 - mh, 22, Math.max(4, mh), 9); ctx.fill(); ctx.restore();
-      text('ふくらみ', 25, 466, 16, '#ffe066', 'center', 900, '#1b1430', 4);
-      text('パン!', 25, 138, 16, '#ffffff', 'center', 900, '#1b1430', 4);
+      ctx.save(); ctx.fillStyle = 'rgba(20,12,42,0.85)'; rr(28, 150, 30, 300, 12); ctx.fill();
+      var mh = 292 * v.inflate; ctx.fillStyle = v.inflate > 0.8 ? '#ff7a3a' : '#ffd84a'; rr(32, 446 - mh, 22, Math.max(4, mh), 9); ctx.fill(); ctx.restore();
+      text('ふくらみ', 43, 466, 16, '#ffe066', 'center', 900, '#1b1430', 4);
+      text('パン!', 43, 138, 16, '#ffffff', 'center', 900, '#1b1430', 4);
     }
     if (G.pop) {   // くす玉が 割れるように ドーン!
       var k = (G.at - G.pop.t0) / 0.9, A = window.DARUMA_ART;
