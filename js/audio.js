@@ -117,8 +117,14 @@ var AUDIO = (function () {
       case 'warn': tone(880, t, 0.06, 'square', 0.12); break;
       case 'out': tone(200, t, 0.15, 'sawtooth', 0.25); tone(150, t + 0.15, 0.2, 'sawtooth', 0.22); tone(100, t + 0.35, 0.5, 'sawtooth', 0.2); noise(t, 0.3, 0.2); break;
       case 'shield': [800, 1000, 1200].forEach(function (f, i) { tone(f, t + i * 0.06, 0.15, 'sine', 0.14); }); break;
+      // ゴールデンだるま(2026-11-14): 弾ける「パーン!」+ファンファーレ / しぼむ「ぷしゅ〜」 / ぷるぷる
+      case 'gpop': noise(t, 0.35, 0.45); tone(160, t, 0.2, 'square', 0.25); [523, 659, 784, 1047, 1319, 1568].forEach(function (f, i) { tone(f, t + 0.12 + i * 0.07, 0.22, 'square', 0.13); }); tone(1047, t + 0.6, 0.5, 'triangle', 0.15); break;
+      case 'gpshu': (function () { if (!ctx) return; var o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'sawtooth'; o.frequency.setValueAtTime(700, t); o.frequency.exponentialRampToValueAtTime(90, t + 0.9); g.gain.setValueAtTime(0.12, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.95); o.connect(g); g.connect(master); o.start(t); o.stop(t + 1); })(); noise(t, 0.8, 0.08); break;
+      case 'gpuru': [0, 1, 2, 3].forEach(function (i) { tone(520 + (i % 2) * 60, t + i * 0.05, 0.05, 'triangle', 0.1); }); break;
       case 'best': [523, 659, 784, 1047, 784, 1047].forEach(function (f, i) { tone(f, t + [0, .12, .24, .36, .6, .72][i], 0.2, 'square', 0.13); }); break;
     }
   }
-  return { unlock: unlock, bgm: bgm, stop: stop, sfx: sfx, setMute: setMute, isMuted: isMuted, suspend: suspend, resume: resume, state: function () { return { ctx: ctx ? ctx.state : 'none', timer: !!timer, cur: cur }; } };
+  // ふくらむ音「ぷぅ」: k = 0〜1 で だんだん高くなる
+  function puu(k) { if (!ctx || document.hidden) return; var t = ctx.currentTime, f = 220 + 900 * Math.max(0, Math.min(1, k)); tone(f, t, 0.07, 'triangle', 0.14); tone(f * 1.5, t + 0.02, 0.05, 'sine', 0.05); }
+  return { puu: puu, unlock: unlock, bgm: bgm, stop: stop, sfx: sfx, setMute: setMute, isMuted: isMuted, suspend: suspend, resume: resume, state: function () { return { ctx: ctx ? ctx.state : 'none', timer: !!timer, cur: cur }; } };
 })();

@@ -50,7 +50,8 @@
     // 企画の係の案(2026-11-14)
     KOROBI_P: 0.04, KOROBI_P_SLEEPY: 0.08, KOROBI_SEC: 2.5, KOROBI_UP: 0.5,       // ほんとうに ころんだ
     GIRIGIRI_SEC: 0.15, GIRIGIRI_BONUS: 50,                                     // ギリギリセーフ
-    KIN_EVERY: 50, KIN_CYCLES: 3,                                               // 金だるま
+    KIN_EVERY: 50, KIN_CYCLES: 3,                                               // 金だるま(使っていない)
+    GOLDEN_P: 0.10, GOLDEN_P_AGAIN: 0.04, GOLDEN_SEC: 7, GOLDEN_TAP: 0.06, GOLDEN_DECAY: 0.12, GOLDEN_POINTS: 600, GOLDEN_SPEED_BONUS: 40, GOLDEN_FLOP_POINTS: 50, GOLDEN_AFTER: 1.5,   // ゴールデンだるま
     BOUSAN_P: 0.08, SAISEN_WISH: 5, RENDA_TITLE: 15, IPPO_DROPS: 3,
     REACT_PRE: 0.40, REACT_GRACE: 0.25,   // 「!?」+ 猶予 = 0.65 秒(フェアさの基準 0.63 秒より長く)
     REACT_WATCH: 1.2, REACT_DEMO_PRE: 1.0, TSUNTSUN_JOY_P: 0.15, FACE_COMMON_P: 0.10, FACE_RARE_P: 0.025,
@@ -297,7 +298,7 @@
     return -1;
   }
   function kindAt(d, t) { var p = phaseAt(d, t); return p ? p.k : 'SAFE'; }
-  var SAFE_KINDS = { SAFE: 1, PAUSE: 1, FROZEN: 1, STOP: 1, PERFECT: 1, KOROBI: 1 };
+  var SAFE_KINDS = { SAFE: 1, PAUSE: 1, FROZEN: 1, STOP: 1, PERFECT: 1, KOROBI: 1, GOLDEN: 1 };
   function isDanger(k) { return k === 'WARN' || k === 'GRACE' || k === 'WATCH'; }
 
   // 今のかけ声で、何文字目まで言ったか(0〜10)
@@ -661,6 +662,17 @@
       var mi = phaseIndex(S.d, t1);
       for (var mj = mi; mj < S.d.ph.length; mj++) if (S.d.ph[mj].k === 'RETURN') { S.mutekiUntil = Math.max(S.mutekiUntil, S.d.ph[mj].e); break; }
     }
+    // ゴールデンだるま: 出ている間は 本体は 振り向かない(GOLDEN の区間)。トン! で ふくらむ
+    if (S.goldenAt && t1 >= S.goldenAt && !S.golden) {
+      S.goldenAt = 0; S.goldenCount = (S.goldenCount || 0) + 1;
+      S.golden = { s: t1, e: t1 + CONFIG.GOLDEN_SEC, inflate: 0, taps: 0 };
+      rebuild(S, t1, { sec: 9999, kind: 'GOLDEN' }, 0);
+      ev.push({ type: 'goldenStart' });
+    }
+    if (S.golden) {
+      S.golden.inflate = Math.max(0, S.golden.inflate - CONFIG.GOLDEN_DECAY * dt);
+      if (t1 >= S.golden.e) { S.score += CONFIG.GOLDEN_FLOP_POINTS; ev.push({ type: 'goldenFlop', pts: CONFIG.GOLDEN_FLOP_POINTS, inflate: S.golden.inflate }); endGolden(S, t1); }
+    }
     // ミステリーボックスが 開いた
     if (S.pendingMystery && t1 >= S.pendingMystery.at) {
       var pm = S.pendingMystery; S.pendingMystery = null;
@@ -687,6 +699,10 @@
     return ev;
   }
 
+  function endGolden(S, t) {
+    S.golden = null;
+    rebuild(S, t, { sec: CONFIG.GOLDEN_AFTER, kind: 'FROZEN', say: null }, 0);   // 戻った直後 1.5秒は 振り向かない →「だ」から
+  }
   function endTutorial(S) {
     S.tutorial = false; S.playT = 0; S.score = 0; S.dropped = 0; S.stageDrops = 0; S.combo = 0; S.bestCombo = 0; S.squeezes = 0; S.bestWindow = 0;
     S.counts = { gold: 0, bomb: 0, okoriDrops: 0, nemuiDrops: 0, hengaoOK: 0, dajareUke: 0, perfects: 0, shieldSaves: 0 };
@@ -726,7 +742,7 @@
     var n = b.kind === 'double' ? 2 : 1;
     var before = S.dropped;
     S.dropped += n;
-    if (!S.tutorial && Math.floor(S.dropped / CONFIG.KIN_EVERY) > Math.floor(before / CONFIG.KIN_EVERY)) { S.kinPending = true; ev.push({ type: 'kinSoon' }); }
+    // (金だるま は やめた: ゴールデンだるま と かぶるため。2026-11-14)
     if (!o.perfect) S.stageDrops = (S.stageDrops || 0) + n;
     if (mood === 'okori') S.counts.okoriDrops += n;
     if (mood === 'nemui') S.counts.nemuiDrops += n;
@@ -761,6 +777,15 @@
     if (t - S.lastHitAt < CONFIG.HIT_MIN_GAP) return ev;
     S.lastHitAt = t;
     var ph = phaseAt(S.d, t), k = ph ? ph.k : 'SAFE';
+    if (S.golden) {
+      var gd = S.golden; gd.taps++; gd.inflate = Math.min(1, gd.inflate + CONFIG.GOLDEN_TAP);
+      if (gd.inflate >= 1) {
+        var rate = gd.taps / Math.max(0.5, t - gd.s), pts = CONFIG.GOLDEN_POINTS + Math.round(rate * CONFIG.GOLDEN_SPEED_BONUS);
+        S.score += pts; S.counts.goldenPop = (S.counts.goldenPop || 0) + 1;
+        ev.push({ type: 'goldenPop', pts: pts, rate: rate }); endGolden(S, t);
+      } else ev.push({ type: 'goldenTap', inflate: gd.inflate });
+      return ev;
+    }
     if (isWatching(S.d, t, S.blindUntil) && t < S.mutekiUntil) {   // むてき: 見られても「ずるい!」で おしまい
       if (S.mutekiSavedPh !== ph) { S.mutekiSavedPh = ph; ev.push({ type: 'mutekiSave' }); }
     } else if (isWatching(S.d, t, S.blindUntil)) {
@@ -839,6 +864,9 @@
       else if (mood === 'okori' || mood === 'gekido') setMoodRaw(S.d, 'nakisou', 3);
       else setMoodRaw(S.d, 'okori', 4);
       ev.push(reactTurn(S, t, pickFace(S, joy ? 'joy' : 'tsuntsun'), joy ? 'joy' : 'tsuntsun'));
+      if (!S.tutorial && rng() < ((S.goldenCount || 0) ? CONFIG.GOLDEN_P_AGAIN : CONFIG.GOLDEN_P)) {
+        for (var gi = S.d.ph.length - 1; gi >= 0; gi--) if (S.d.ph[gi].react && S.d.ph[gi].k === 'RETURN') { S.goldenAt = S.d.ph[gi].e; break; }
+      }
       ev.push({ type: 'tease', cry: !joy && (mood === 'okori' || mood === 'gekido'), joy: joy });
     } else if (name === 'hengao') {
       // にらめっこ: こっち向きを縮めるだけ(気分は変えない)。使ったら待ち時間。同じ手を続けると あきる

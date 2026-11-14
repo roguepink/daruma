@@ -41,11 +41,13 @@
     { id: 'oneeye', name: '片目', group: 'rare' }, { id: 'blind', name: '目かくし', group: 'rare' }
   ];
   function realFaces() { var A = window.DARUMA_ART; return A && A.FACES && A.FACES.length ? A.FACES : null; }
-  function faceList() { return realFaces() || FALLBACK_FACES; }
+  var GOLDEN_FACE = { id: 'golden', name: 'ゴールデンだるま', group: 'rare' };
+  function faceList() { var L = realFaces() || FALLBACK_FACES; return L.concat([GOLDEN_FACE]); }
+  function reactFaces() { return realFaces() || FALLBACK_FACES; }
   function faceById(id) { var L = faceList(); for (var i = 0; i < L.length; i++) if (L[i].id === id) return L[i]; return null; }
   // 気分・チラ見・アウトの顔(絵の表情名)を、一覧の id か 名前で さがす
   function faceIdOfArt(artMood) { var L = faceList(); for (var i = 0; i < L.length; i++) if (L[i].id === artMood || L[i].name === artMood) return L[i].id; return null; }
-  D.setFaces(faceList());
+  D.setFaces(reactFaces());
   function drawFaceById(c, x, y, size, id, opts) {
     opts = opts || {};
     var A = window.DARUMA_ART;
@@ -186,12 +188,13 @@
   function startGame(opts) {
     opts = opts || {};
     hideAll();
-    refreshRecords(); D.setFaces(faceList());
+    refreshRecords(); D.setFaces(reactFaces());
     var tutorial = opts.tutorial != null ? opts.tutorial : !G.rec.tutorialDone;
     var seed = opts.seed || ((Date.now() ^ (Math.random() * 1e9)) >>> 0);
     G.S = D.newGame({ seed: seed, tutorial: tutorial, firstPlay: G.rec.stats.plays === 0, daily: G.daily.mood });
     G.mode = 'play'; G.paused = false; G.countdown = 0; G.acc = 0;
     G.fx = []; G.flyers = []; G.texts = []; G.bubble = null; G.pbubble = null; G.tip = null; G.flash = 0; G.shake = 0; G.fall = 0;
+    G.pop = null; G.flop = null; G.goldenView = null;
     G.goalPassed = {}; G.goalBestDan = G.rec.bestDan; G.sceneIdx = null; G.netaAt = null; G.backNetaAt = 0; G.ippoText = G.at + 1.6;
     G.chantAt = []; G.faceOver = null; G.sessionFaces = {}; G.faceTag = null; G.outInfo = null; G.tapX = null; G.comboEnd = 0;
     if (tutorial) { say('れんしゅう だよ!むこうを むいたら トン!', 3); }
@@ -221,7 +224,7 @@
   function say(text, sec, col) { G.bubble = { text: text, until: G.at + (sec || 1.6), col: col || '#fffaf0', t0: G.at }; }
   function psay(text, sec) { G.pbubble = { text: text, until: G.at + (sec || 2), t0: G.at }; }
   // ヒントを出してはいけない時(だるまさんが見そう・見ている・むてき中)
-  function tipBlocked(S) { var k = D.kindAt(S.d, S.t); return k === 'WARN' || k === 'FEINT' || k === 'GRACE' || k === 'WATCH' || k === 'PERFECT' || midWarn(S, S.t); }
+  function tipBlocked(S) { var k = D.kindAt(S.d, S.t); return k === 'WARN' || k === 'FEINT' || k === 'GRACE' || k === 'WATCH' || k === 'PERFECT' || !!S.golden || midWarn(S, S.t); }
   function tip(key, text) { if (G.tipsShown[key]) return; G.tipsShown[key] = true; G.tip = { text: text, until: G.at + 3.2, t0: G.at }; }
   function floatText(x, y, text, col, size, dur) { var o = { x: x, y: y, text: text, col: col || '#fff', size: size || 22, t0: G.at, dur: dur || 0.9 }; G.texts.push(o); return o; }
   function burst(x, y, col, n, spd) {
@@ -324,6 +327,14 @@
           sfx('shield'); say('あれ?気のせいかな〜?', 1.8, '#e6dcff'); burst(195, 240, '#d8f4ff', 30, 240); G.flash = 0.6; G.flashCol = '200,240,255';
           break;
         case 'react': break;
+        case 'goldenStart': seeFace('golden'); sfx('item'); G.goldenT0 = G.at; G.goldenView = { inflate: 0 }; say('な、なにか 出た…!?', 1.4, '#fff3c0'); AUDIO.bgm('fever'); break;
+        case 'goldenTap': try { AUDIO.puu(e.inflate); } catch (x) {} if (e.inflate > 0.75 && G.lastRng() < 0.3) sfx('gpuru'); G.swing = 1; break;
+        case 'goldenPop':
+          sfx('gpop'); G.pop = { t0: G.at }; G.goldenView = null; G.shake = 0.6; G.flash = 0.9; G.flashCol = '255,230,120';
+          for (var cf = 0; cf < 6; cf++) burst(195, 330, ['#ff4a6a', '#ffd84a', '#4ac8ff', '#7ae05a', '#ff9ad0', '#ffffff'][cf], 18, 420);
+          floatText(195, 470, '+' + fmt(e.pts), '#ffe066', 40, 1.6); faceOverride('surprised', 1.8); moodBgm();
+          break;
+        case 'goldenFlop': sfx('gpshu'); G.flop = { t0: G.at, inflate: e.inflate }; G.goldenView = null; floatText(195, 470, 'ぷしゅ〜 +' + e.pts, '#ffe8a0', 26, 1.4); say('……おしい!', 1.4); moodBgm(); break;
         case 'korobi': sfx('drop'); G.shake = 0.3; floatText(195, 330, 'ほんとうに ころんだ!', '#9be15d', 28, 1.4); say('あいたたた…', 1.4); break;
         case 'getup': sfx('ok'); say('よいしょ! 七転び八起き!', 1.2); break;
         case 'girigiri': G.slowUntil = G.at + 0.3; sfx('shield'); floatText(195, 380, 'ギリギリ セーフ!!', '#ffe066', 40, 1.3); floatText(250, 430, '+' + C.GIRIGIRI_BONUS, '#ffe066', 22, 1.0); break;
@@ -409,7 +420,7 @@
     $('rBest').textContent = isBest ? '★ ベスト更新!' : 'ベストまで あと ' + fmt(r.best - st.score) + ' 点';
     $('rBest').classList.toggle('best', isBest);
     $('rWin').textContent = '1回で いちばん多く ' + st.bestWindow + 'こ / ' + st.scene.name + 'まで 行けた!';
-    $('rStats').textContent = 'コンボ ' + st.bestCombo + ' / ギリギリ ' + (st.counts.girigiri || 0) + ' / 金だるま ' + (S.kinDone || 0) + ' / ' + Math.floor(st.time / 60) + '分' + Math.floor(st.time % 60) + '秒';
+    $('rStats').textContent = 'コンボ ' + st.bestCombo + ' / ギリギリ ' + (st.counts.girigiri || 0) + ' / ゴールデン ' + (st.counts.goldenPop || 0) + ' / ' + Math.floor(st.time / 60) + '分' + Math.floor(st.time % 60) + '秒';
     var nextT = null; for (var ti = 0; ti < D.TITLES.length; ti++) if (r.stats.titles.indexOf(D.TITLES[ti].id) < 0) { nextT = D.TITLES[ti]; break; }
     $('rNext').textContent = nextT ? 'つぎの称号: ' + nextT.name + '(' + nextT.how + ')' : '称号を ぜんぶ とったよ!';
     $('rToast').textContent = '';
@@ -768,6 +779,74 @@
       else { safeDraw('drawHead', [ctx, x, y - 66, 110 * (0.6 + 0.4 * sc), { turn: 1, mood: 'furious', t: G.at, shadow: false }]); text('げきおこ!!', x, y + 112, 30, '#ff3030', 'center', 900, '#ffffff', 6); text('点数3倍・すぐ ふりむく', x, y + 146, 18, '#ffffff', 'center', 900, '#1b1430', 5); }
     }
   }
+  // ゴールデンだるま: 顔が 風船のように パンパンに ふくらむ(均等に大きくしない)。inflate 0〜1
+  function drawGolden(c, x, y, size, inflate, t, shake) {
+    var A = window.DARUMA_ART;
+    try { if (A && typeof A.drawGoldenBalloon === 'function') { A.drawGoldenBalloon(c, x, y, size, inflate, { t: t || 0, shake: shake || 0 }); return; } } catch (e) {}
+    var r = size / 2, k = inflate, sq = 1 + 0.18 * k;   // 横に ふくらむ
+    c.save(); c.translate(x + (shake ? Math.sin((t || 0) * 70) * shake * 4 : 0), y);
+    var g = c.createRadialGradient(-r * 0.35, -r * 0.4, r * 0.1, 0, 0, r * 1.05);
+    g.addColorStop(0, '#fff8c0'); g.addColorStop(0.45, '#ffd23a'); g.addColorStop(1, '#c08000');
+    c.fillStyle = g; c.strokeStyle = '#6a4400'; c.lineWidth = Math.max(2, r * 0.04);
+    c.beginPath(); c.ellipse(0, 0, r * sq, r * (1.02 - 0.06 * k), 0, 0, 6.283); c.fill(); c.stroke();
+    // 顔の窓
+    c.fillStyle = 'rgba(255,250,230,0.92)'; c.beginPath(); c.ellipse(0, -r * 0.05, r * (0.55 + 0.2 * k), r * (0.48 + 0.1 * k), 0, 0, 6.283); c.fill();
+    // ほっぺ(パンパン)
+    c.fillStyle = 'rgba(255,120,120,' + (0.35 + 0.4 * k) + ')';
+    c.beginPath(); c.arc(-r * (0.3 + 0.18 * k), r * 0.08, r * (0.12 + 0.2 * k), 0, 6.283); c.arc(r * (0.3 + 0.18 * k), r * 0.08, r * (0.12 + 0.2 * k), 0, 6.283); c.fill();
+    // 目(ふくらむと 細く 上へ)と 口(小さな o)
+    c.strokeStyle = '#1b1430'; c.lineWidth = Math.max(2, r * 0.05); c.lineCap = 'round';
+    var ey = -r * (0.16 + 0.12 * k), ew = r * 0.1;
+    if (k < 0.5) { c.fillStyle = '#1b1430'; c.beginPath(); c.arc(-r * 0.2, ey, r * 0.07, 0, 6.283); c.arc(r * 0.2, ey, r * 0.07, 0, 6.283); c.fill(); }
+    else { c.beginPath(); c.moveTo(-r * 0.2 - ew, ey); c.lineTo(-r * 0.2 + ew, ey - r * 0.03); c.moveTo(r * 0.2 - ew, ey - r * 0.03); c.lineTo(r * 0.2 + ew, ey); c.stroke(); }
+    c.fillStyle = '#7a2010'; c.beginPath(); c.ellipse(0, r * (0.22 - 0.04 * k), r * (0.06 - 0.02 * k), r * (0.08 - 0.03 * k), 0, 0, 6.283); c.fill();
+    // ひげ
+    c.beginPath(); c.moveTo(-r * 0.05, r * 0.1); c.quadraticCurveTo(-r * 0.2, r * 0.06, -r * 0.3, r * 0.13); c.moveTo(r * 0.05, r * 0.1); c.quadraticCurveTo(r * 0.2, r * 0.06, r * 0.3, r * 0.13); c.stroke();
+    // つや
+    c.fillStyle = 'rgba(255,255,255,0.6)'; c.beginPath(); c.ellipse(-r * 0.45, -r * 0.55, r * 0.14, r * 0.07, -0.6, 0, 6.283); c.fill();
+    c.restore();
+  }
+  function drawGoldenScene(S) {
+    var gd = S.golden;
+    if (gd) {
+      var v = G.goldenView || (G.goldenView = { inflate: 0 });
+      v.inflate += (gd.inflate - v.inflate) * 0.35;
+      var appear = Math.min(1, (G.at - (G.goldenT0 || G.at)) / 0.25), sz = (80 + 560 * Math.pow(v.inflate, 1.3)) * (0.4 + 0.6 * appear);
+      var cy = 330 - Math.min(40, sz * 0.05);
+      drawGolden(ctx, 195, cy, sz, v.inflate, G.at, v.inflate > 0.75 ? (v.inflate - 0.75) * 4 : 0);
+      if (G.at - G.goldenT0 < 1.2) text('ゴールデンだるま!', 195, cy - sz / 2 - 20, 24, '#ffe066', 'center', 900, '#6a4400', 6);
+      // 残り時間のゲージ(ボタンの上)
+      var left = Math.max(0, (gd.e - S.t) / C.GOLDEN_SEC);
+      ctx.save(); ctx.fillStyle = 'rgba(20,12,42,0.8)'; rr(16, 604, 358, 16, 8); ctx.fill();
+      ctx.fillStyle = left < 0.3 ? '#ff6a4a' : '#ffd84a'; rr(18, 606, Math.max(8, 354 * left), 12, 6); ctx.fill(); ctx.restore();
+    }
+    if (G.pop) {   // くす玉が 割れるように ドーン!
+      var k = (G.at - G.pop.t0) / 0.9, A = window.DARUMA_ART;
+      if (k >= 1) G.pop = null;
+      else {
+        var done = false;
+        try { if (A && typeof A.drawGoldenPop === 'function') { A.drawGoldenPop(ctx, 195, 330, 640, k, { t: G.at, text: 'ドーン!' }); done = true; } } catch (e) {}
+        if (!done) {
+          ctx.save();
+          var rg = ctx.createRadialGradient(195, 330, 10, 195, 330, 420 * (0.3 + k)); rg.addColorStop(0, 'rgba(255,250,200,' + (1 - k) + ')'); rg.addColorStop(1, 'rgba(255,200,60,0)');
+          ctx.fillStyle = rg; ctx.fillRect(-200, -200, W + 400, H + 400);
+          for (var hf = -1; hf <= 1; hf += 2) {   // くす玉の 半分ずつ
+            ctx.save(); ctx.translate(195 + hf * 30 * k, 330 + 260 * k * k); ctx.rotate(hf * 1.2 * k);
+            ctx.fillStyle = '#ffcc30'; ctx.strokeStyle = '#6a4400'; ctx.lineWidth = 4;
+            ctx.beginPath(); ctx.arc(0, 0, 110, hf < 0 ? Math.PI / 2 : -Math.PI / 2, hf < 0 ? Math.PI * 1.5 : Math.PI / 2); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
+          }
+          for (var i = 0; i < 24; i++) { var a = i * 0.7, d = 60 + 380 * k; ctx.fillStyle = ['#ff4a6a', '#4ac8ff', '#7ae05a', '#ff9ad0', '#ffffff', '#ffd84a'][i % 6]; ctx.fillRect(195 + Math.cos(a) * d, 330 + Math.sin(a) * d + 120 * k * k, 10, 6); }
+          ctx.restore();
+          text('ドーン!', 195, 300, 70 * (0.6 + 0.6 * Math.min(1, k * 3)), '#ff3a50', 'center', 900, '#ffffff', 10);
+        }
+      }
+    }
+    if (G.flop) {   // ぷしゅ〜 と しぼんで 飛んでいく
+      var q = (G.at - G.flop.t0) / 1.2;
+      if (q >= 1) G.flop = null;
+      else { var fs = (80 + 560 * Math.pow(G.flop.inflate, 1.3)) * (1 - q * 0.8); drawGolden(ctx, 195 + q * 260 + Math.sin(q * 30) * 20, 330 - q * 380, Math.max(30, fs), Math.max(0, G.flop.inflate * (1 - q)), G.at, 0.5); }
+    }
+  }
   var goldCv = null;
   function drawGoldHead(x, y, size, hopts) {
     var sc = Math.max(1, VIEW.s * VIEW.dpr), pad = size * 0.9, w = Math.ceil(pad * 2 * sc);
@@ -1071,6 +1150,7 @@
     if (midWarn(S, t)) return blind ? 'blind' : 'warn';
     if (k === 'PERFECT') return 'perfect';
     if (k === 'KOROBI') return 'korobi';
+    if (S.golden) return 'golden';
     if (D.isDanger(k) || k === 'FEINT') {
       if (blind) return 'blind';
       if (t < S.mutekiUntil) return 'muteki';
@@ -1088,6 +1168,7 @@
     else if (st === 'watch') { fill = '#e5221b'; label = 'さわらないで!'; col = '#ffffff'; border = '#7a0000'; bw = 6; }
     else if (st === 'blind') { fill = '#c9b6f2'; label = '見えてないよ'; }
     else if (st === 'muteki') { fill = '#ffd84a'; label = 'むてき!'; border = '#a06000'; bw = 6; }
+    else if (st === 'golden') { var gg2 = ctx.createLinearGradient(r.x, r.y, r.x, r.y + r.h); gg2.addColorStop(0, '#fff2a0'); gg2.addColorStop(1, '#e8a810'); fill = gg2; label = 'ふくらませろ!'; border = '#8a5a00'; bw = 6; grow = pulse * 3; }
     else if (st === 'korobi') { fill = '#b8f070'; label = 'いまだ!連打!'; grow = pulse * 3; }
     else if (st === 'wait') { fill = '#9a94a8'; label = 'まってね'; }
     else {   // パーフェクト: 桃と金(赤には しない)
@@ -1221,6 +1302,7 @@
     drawFx(dt);
     drawBubbles(hp.headY);
     drawPractice(S, t);
+    if (S.golden || G.pop || G.flop) { drawGoldenScene(S); drawTon(S, t); }   // トン!(ふくらませろ!)は いちばん上に
     if (G.ippoText && G.at < G.ippoText) { var ia = Math.min(1, (G.ippoText - G.at) / 0.4); ctx.save(); ctx.globalAlpha = ia; text('はじめの… いーっぽ!', 195, 400, 34, '#ffe066', 'center', 900, '#1b1430', 7); ctx.restore(); }
     drawVignette(S, t);
     drawMystery();
@@ -1321,6 +1403,7 @@
       var dia = GRID_CELL / 1.25, A = window.DARUMA_ART, th = null;
       if (seen.indexOf(f.id) >= 0) {
         if (newSet && newSet[f.id]) { c.save(); c.fillStyle = 'rgba(255,224,102,0.35)'; c.beginPath(); c.arc(x, y, GRID_CELL * 0.48, 0, 6.283); c.fill(); c.restore(); }
+        if (f.id === 'golden') { drawGolden(c, x, y + 2, dia * 0.95, 0.45, 0); continue; }
         try { if (realFaces() && A.faceThumb) th = A.faceThumb(f.id, dia, sc); } catch (e) { th = null; }
         if (th) c.drawImage(th, x - dia * 0.75, y + 3 - dia * 0.78, dia * 1.5, dia * 1.5);   // 1回だけ描いて覚えた 小さな絵
         else drawFaceById(c, x, y + 1, GRID_CELL * 0.8, f.id, {});
