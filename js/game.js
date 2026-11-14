@@ -66,9 +66,10 @@
     c.font = '900 ' + Math.round(size * 0.45) + 'px ' + FONT; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = 'rgba(255,255,255,0.65)'; c.fillText('?', x, y + 1); c.restore();
   }
   var REACT_LINES = {
-    tsuntsun: ['なにすんの!', 'もー!', 'つつかないでよ〜', 'ぷんぷん!'], joy: ['えへへ、もっと〜♪', 'くすぐったい〜♪', 'つんつん すき♪'],
-    kusuguru: ['ひゃははは!', 'くすくす… やめて〜', 'こしょばい〜!'], uke: ['あはは! いまの もう1回 言って', 'ぶははっ!', 'お腹 いたい〜'],
-    flop: ['さむっ… お茶 ちょうだい', '……つまんない', 'しーん…'], bored: ['もう きかないよ〜', 'またそれ〜?'], demo: ['つんつん されると こっちを むくよ!']
+    angry: ['なにすんの!', 'もー!', 'つつかないでよ〜', 'ぷんぷん!'], tsuntsun: ['なにすんの!', 'もー!'], cry: ['いたいよ〜…', 'ひどい… ぐすっ', 'うえ〜ん'],
+    joy: ['えへへ、もっと〜♪', 'つんつん すき♪', 'もう1回 やって♪'], neutral: ['……ん?', 'なにか ご用?', 'え、なに?'],
+    laugh: ['ひゃははは!', 'くすくす… やめて〜', 'こしょばい〜!'], kusuguru: ['ひゃははは!', 'こしょばい〜!'], uke: ['あはは! いまの もう1回 言って', 'ぶははっ!', 'お腹 いたい〜'],
+    flop: ['さむっ… お茶 ちょうだい', '……つまんない', 'しーん…'], bored: ['もう きかないよ〜', 'またそれ〜?'], demo: ['つんつん されると こっちを むくよ! たまに なにか 出るかも?']
   };
   var WATCH_NETA = {
     any: ['…じーっ(目が かわいてきた)', 'まばたき がまん…', 'きみの うしろに なにか いる… うそ', 'いま 動いた? 動いてないね?', 'にらめっこ なら まけないよ'],
@@ -227,22 +228,23 @@
   function tipBlocked(S) { var k = D.kindAt(S.d, S.t); return k === 'WARN' || k === 'FEINT' || k === 'GRACE' || k === 'WATCH' || k === 'PERFECT' || !!S.golden || midWarn(S, S.t); }
   function tip(key, text) { if (G.tipsShown[key]) return; G.tipsShown[key] = true; G.tip = { text: text, until: G.at + 3.2, t0: G.at }; }
   var BIG_Y = 360, BIG_X = 236, BIG_W = 272;   // 大きな文字の 場所(左の列「ころんだ」「この回」の 右。吹き出しと 重ならない)
-  function bigMsg(text, col, size, dur, prio) {
+  function bigMsg(text, col, size, dur, prio, y) {
     var b = G.big;
     if (b && G.at - b.t0 < b.dur && b.prio > prio) return null;   // もっと大事な字が 出ている
-    G.big = { text: text, col: col, size: size, dur: dur || 1.0, prio: prio, t0: G.at };
+    G.big = { text: text, col: col, size: size, dur: dur || 1.0, prio: prio, t0: G.at, y: y };
     if (prio >= 2 && G.ptsText) { var ix = G.texts.indexOf(G.ptsText); if (ix >= 0) G.texts.splice(ix, 1); G.ptsText = null; }
     return G.big;
   }
   function bigBusy(minPrio) { var b = G.big; return !!b && G.at - b.t0 < b.dur && b.prio >= minPrio; }
   function drawBig() {
     var b = G.big; if (!b) return;
+    var rp = G.S && D.phaseAt(G.S.d, G.S.t); if (rp && rp.react && (rp.k === 'WARN' || rp.k === 'GRACE')) return;
     var a = (G.at - b.t0) / b.dur; if (a >= 1) { G.big = null; return; }
     ctx.save(); ctx.globalAlpha = a < 0.75 ? 1 : 1 - (a - 0.75) / 0.25;
     var sc = a < 0.12 ? 0.6 + a / 0.12 * 0.5 : 1.1 - Math.min(0.1, a - 0.12);
     ctx.font = '900 ' + (b.size * sc) + 'px ' + FONT;
     var wmax = ctx.measureText(b.text).width, s2 = wmax > BIG_W ? BIG_W / wmax : 1;
-    text(b.text, BIG_X, BIG_Y - a * 16, b.size * sc * s2, b.col, 'center', 900, '#1b1430', Math.max(4, b.size * 0.2));
+    text(b.text, b.y ? 195 : BIG_X, (b.y || BIG_Y) - a * 16, b.size * sc * s2, b.col, 'center', 900, '#1b1430', Math.max(4, b.size * 0.2));
     ctx.restore();
   }
   function floatText(x, y, text, col, size, dur) { var o = { x: x, y: y, text: text, col: col || '#fff', size: size || 22, t0: G.at, dur: dur || 0.9 }; G.texts.push(o); return o; }
@@ -284,8 +286,9 @@
             var fobj = faceById(e.ph.face), lines = REACT_LINES[e.ph.react] || REACT_LINES.tsuntsun;
             seeFace(e.ph.face);
             G.faceTag = { name: fobj ? fobj.name : '', until: G.at + 1.3 };
-            say((fobj && fobj.line) || lines[Math.floor(G.lastRng() * lines.length)], 1.4, e.ph.react === 'tsuntsun' || e.ph.react === 'flop' ? '#ffd8cc' : '#fffaf0');
-            sfx(e.ph.react === 'tsuntsun' ? 'angry' : e.ph.react === 'flop' || e.ph.react === 'bored' ? 'flop' : 'laugh');
+            var rk = e.ph.react;
+            say(lines[Math.floor(G.lastRng() * lines.length)], 1.2, rk === 'angry' || rk === 'flop' || rk === 'cry' ? '#ffd8cc' : '#fffaf0');
+            sfx(rk === 'angry' ? 'angry' : rk === 'flop' || rk === 'bored' || rk === 'cry' ? 'flop' : rk === 'neutral' ? 'tap' : 'laugh');
           } else if (e.k === 'WATCH') {
             if (!blind) seeFace(faceIdOfArt(D.MOODS[S.d.mood].art));
             if (!blind && e.ph.alt) { faceOverride('shy', 1.6); setTimeout(function () { say('…いまの ぼくじゃ ないよ', 1.4, '#ffe0f0'); }, 150); }
@@ -300,7 +303,7 @@
           break;
         case 'returned':
           moodBgm();
-          if (e.drops > 0) floatText(46, 236, e.drops + 'こ セーフ!', '#9be15d', 22, 1.1);
+          if (e.drops > 0) G.safeShow = { n: e.drops, until: G.at + 1.1 };
           if (e.drops >= 5 && G.lastRng() < 0.35) say('……あれ? なんか 背が ひくくなってない?', 2.2);
           break;
         case 'goldSeen': say('いま 金色の なにか 飛んでかなかった?', 2.0); break;
@@ -346,12 +349,12 @@
           sfx('shield'); say('あれ?気のせいかな〜?', 1.8, '#e6dcff'); burst(195, 240, '#d8f4ff', 30, 240); G.flash = 0.6; G.flashCol = '200,240,255';
           break;
         case 'react': break;
-        case 'goldenStart': seeFace('golden'); sfx('item'); G.goldenT0 = G.at; G.goldenView = { inflate: 0 }; say('な、なにか 出た…!?', 1.4, '#fff3c0'); AUDIO.bgm('fever'); break;
+        case 'goldenStart': seeFace('golden'); sfx('item'); G.ippoText = 0; bigMsg('ゴールデンだるま!', '#ffe066', 30, 1.3, 3); G.goldenT0 = G.at; G.goldenView = { inflate: 0 }; say('な、なにか 出た…!?', 1.4, '#fff3c0'); AUDIO.bgm('fever'); break;
         case 'goldenTap': try { AUDIO.puu(e.inflate); } catch (x) {} if (e.inflate > 0.75 && G.lastRng() < 0.3) sfx('gpuru'); G.swing = 1; break;
         case 'goldenPop':
           sfx('gpop'); G.pop = { t0: G.at }; G.goldenView = null; G.shake = 0.6; G.flash = 0.9; G.flashCol = '255,230,120';
           for (var cf = 0; cf < 6; cf++) burst(195, 330, ['#ff4a6a', '#ffd84a', '#4ac8ff', '#7ae05a', '#ff9ad0', '#ffffff'][cf], 18, 420);
-          bigMsg('ドーン! +' + fmt(e.pts), '#ffe066', 40, 1.6, 3); faceOverride('surprised', 1.8); moodBgm();
+          bigMsg('+' + fmt(e.pts) + '点', '#ffe066', 40, 1.6, 3, 500);   // 「ドーン!」は くす玉の絵が 出す faceOverride('surprised', 1.8); moodBgm();
           break;
         case 'goldenFlop': sfx('gpshu'); G.flop = { t0: G.at, inflate: e.inflate }; G.goldenView = null; bigMsg('ぷしゅ〜 +' + e.pts, '#ffe8a0', 28, 1.4, 3); say('……おしい!', 1.4); moodBgm(); break;
         case 'korobi': sfx('drop'); G.shake = 0.3; bigMsg('ほんとうに ころんだ!', '#9be15d', 30, 1.4, 3); say('あいたたた…', 1.4); break;
@@ -438,7 +441,7 @@
     $('rScore').textContent = fmt(st.score) + ' 点';
     $('rBest').textContent = isBest ? '★ ベスト更新!' : 'ベストまで あと ' + fmt(r.best - st.score) + ' 点';
     $('rBest').classList.toggle('best', isBest);
-    $('rWin').textContent = '1回で いちばん多く ' + st.bestWindow + 'こ / ' + st.scene.name + 'まで 行けた!';
+    $('rWin').textContent = (st.bestWindow > 0 ? '1回で いちばん多く ' + st.bestWindow + 'こ / ' : '') + st.scene.name + 'まで 行けた!';
     $('rStats').textContent = 'コンボ ' + st.bestCombo + ' / ギリギリ ' + (st.counts.girigiri || 0) + ' / ゴールデン ' + (st.counts.goldenPop || 0) + ' / ' + Math.floor(st.time / 60) + '分' + Math.floor(st.time % 60) + '秒';
     var nextT = null; for (var ti = 0; ti < D.TITLES.length; ti++) if (r.stats.titles.indexOf(D.TITLES[ti].id) < 0) { nextT = D.TITLES[ti]; break; }
     $('rNext').textContent = nextT ? 'つぎの称号: ' + nextT.name + '(' + nextT.how + ')' : '称号を ぜんぶ とったよ!';
@@ -833,18 +836,23 @@
       var appear = Math.min(1, (G.at - (G.goldenT0 || G.at)) / 0.25), sz = (80 + 560 * Math.pow(v.inflate, 1.3)) * (0.4 + 0.6 * appear);
       var cy = 330 - Math.min(40, sz * 0.05);
       drawGolden(ctx, 195, cy, sz, v.inflate, G.at, v.inflate > 0.75 ? (v.inflate - 0.75) * 4 : 0);
-      if (G.at - G.goldenT0 < 1.2) text('ゴールデンだるま!', 195, cy - sz / 2 - 20, 24, '#ffe066', 'center', 900, '#6a4400', 6);
       // 残り時間のゲージ(ボタンの上)
-      var left = Math.max(0, (gd.e - S.t) / C.GOLDEN_SEC);
-      ctx.save(); ctx.fillStyle = 'rgba(20,12,42,0.8)'; rr(16, 604, 358, 16, 8); ctx.fill();
-      ctx.fillStyle = left < 0.3 ? '#ff6a4a' : '#ffd84a'; rr(18, 606, Math.max(8, 354 * left), 12, 6); ctx.fill(); ctx.restore();
+      var left = Math.max(0, (gd.e - S.t) / C.GOLDEN_SEC), secs = Math.ceil(gd.e - S.t);
+      ctx.save(); ctx.fillStyle = 'rgba(20,12,42,0.9)'; rr(16, 598, 358, 24, 10); ctx.fill();
+      ctx.fillStyle = left < 0.3 ? '#ff6a4a' : '#8fd0ff'; rr(19, 601, Math.max(10, 352 * left), 18, 8); ctx.fill(); ctx.restore();
+      text('のこり ' + secs + 'びょう', 195, 610, 17, '#ffffff', 'center', 900, '#1b1430', 4);
+      // ふくらみメーター(満タンで 弾ける)
+      ctx.save(); ctx.fillStyle = 'rgba(20,12,42,0.85)'; rr(10, 150, 30, 300, 12); ctx.fill();
+      var mh = 292 * v.inflate; ctx.fillStyle = v.inflate > 0.8 ? '#ff7a3a' : '#ffd84a'; rr(14, 446 - mh, 22, Math.max(4, mh), 9); ctx.fill(); ctx.restore();
+      text('ふくらみ', 25, 466, 16, '#ffe066', 'center', 900, '#1b1430', 4);
+      text('パン!', 25, 138, 16, '#ffffff', 'center', 900, '#1b1430', 4);
     }
     if (G.pop) {   // くす玉が 割れるように ドーン!
       var k = (G.at - G.pop.t0) / 0.9, A = window.DARUMA_ART;
       if (k >= 1) G.pop = null;
       else {
         var done = false;
-        try { if (A && typeof A.drawGoldenPop === 'function') { A.drawGoldenPop(ctx, 195, 330, 640, k, { t: G.at, text: 'ドーン!' }); done = true; } } catch (e) {}
+        try { if (A && typeof A.drawGoldenPop === 'function') { A.drawGoldenPop(ctx, 195, 330, 640, k, { t: G.at, text: 'ドーン!', area: { x: 4, y: 58, w: W - 8, h: 540 } }); done = true; } } catch (e) {}
         if (!done) {
           ctx.save();
           var rg = ctx.createRadialGradient(195, 330, 10, 195, 330, 420 * (0.3 + k)); rg.addColorStop(0, 'rgba(255,250,200,' + (1 - k) + ')'); rg.addColorStop(1, 'rgba(255,200,60,0)');
@@ -1057,7 +1065,10 @@
       text('!?', 46, 230, 48, blind ? '#9a6af0' : '#ff2a2a', 'center', 900, '#ffffff', 7);
     } else if (ph && ph.dbl) {
       text('だっ!', 46, 230, 40, blind ? '#9a6af0' : '#ff2a2a', 'center', 900, '#ffffff', 7);
-    } else if (S.windowDrops > 0) {
+    } else if (G.safeShow && G.at < G.safeShow.until && !(ph && ph.react)) {
+      text(G.safeShow.n + 'こ', 46, 220, 30, '#9be15d', 'center', 900, '#1b1430', 6);
+      text('セーフ!', 46, 254, 20, '#9be15d', 'center', 900, '#1b1430', 5);
+    } else if (S.windowDrops > 0 && !(ph && ph.react)) {
       text('この回', 46, 200, 16, '#ffffff', 'center', 900, '#1b1430', 4);
       text(S.windowDrops + 'こ', 46, 232, 32, '#9be15d', 'center', 900, '#1b1430', 6);
       if (S.combo >= 2) {
@@ -1323,7 +1334,7 @@
     drawBubbles(hp.headY);
     drawPractice(S, t);
     if (S.golden || G.pop || G.flop) { drawGoldenScene(S); drawTon(S, t); }   // トン!(ふくらませろ!)は いちばん上に
-    if (G.ippoText && G.at < G.ippoText && !bigBusy(1)) { var ia = Math.min(1, (G.ippoText - G.at) / 0.4); ctx.save(); ctx.globalAlpha = ia; text('はじめの… いーっぽ!', BIG_X, BIG_Y, 26, '#ffe066', 'center', 900, '#1b1430', 7); ctx.restore(); }
+    if (G.ippoText && G.at < G.ippoText && !bigBusy(1) && !tipBlocked(S)) { var ia = Math.min(1, (G.ippoText - G.at) / 0.4); ctx.save(); ctx.globalAlpha = ia; text('はじめの… いーっぽ!', BIG_X, BIG_Y, 26, '#ffe066', 'center', 900, '#1b1430', 7); ctx.restore(); }
     drawBig();
     drawVignette(S, t);
     drawMystery();
@@ -1410,7 +1421,7 @@
   }
 
   // ------------------------------------------------------------------ かお図鑑(10×10 の一覧。HTML の canvas に1回だけ描く)
-  var GRID_COLS = 10, GRID_CELL = 39;
+  var GRID_COLS = 8, GRID_CELL = 48;
   function countSeen() { var seen = G.rec.stats.faceIds || [], n = 0; faceList().forEach(function (f) { if (seen.indexOf(f.id) >= 0) n++; }); return n; }
   function renderGrid(cv2, newSet) {
     if (!cv2) return;
@@ -1462,6 +1473,7 @@
       if (/ハックション/.test(bn)) G.hop = G.at + 0.6;
       G.backNetaAt = G.at + 12 + G.lastRng() * 10;
     }
+    if (!S.tutorial && S.playT > 20 && D.canUseChotto(S, 'ijiwaru', S.t) && !S.goldenCount) tip('tsuntsun', 'つんつんすると たまに… なにかが 出るかも?');
     var scn = D.sceneOf(S.dropped).idx;
     if (G.sceneIdx != null && scn > G.sceneIdx) bigMsg(D.SCENES[scn][2] + ' に なった!', '#ffffff', 26, 1.6, 2);
     G.sceneIdx = scn;

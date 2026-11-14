@@ -45,13 +45,13 @@
     ITEM_SLOTS: 2, BLINDFOLD_SEC: 5, BLINDFOLD_WARN: 1.0,
     // 2026-11-14 ノブさんの直し: スリル(気分を問わず たまに)・チラ見・ミステリーボックス・げきおこ
     SPICE_FEINT: 0.10, SPICE_FAST: 0.12, SPICE_DOUBLE: 0.08,      // 気分の確率に足す
-    FAST_LETTER_MUL: 0.35, FAST_LETTER_MIN: 0.06, TELL_MIN_FAST: 0.53,   // 早口: 予兆+猶予 = 0.65 秒以上
+    FAST_LETTER_MUL: 0.35, FAST_LETTER_MIN: 0.06, TELL_MIN_FAST: 0.60, FAST_FROM_SEC: 60,   // 早口でも 予兆 0.60(猶予込み 0.72 秒)。はじめの60秒は 早口なし
     PEEK_EVERY: [15, 25], PEEK_DUR: 0.4, PEEK_SAFE_LEFT: 0.7, PEEK_SPEEDUP: 0.6, PEEK_TUTORIAL_AT: 7,
     // 企画の係の案(2026-11-14)
     KOROBI_P: 0.04, KOROBI_P_SLEEPY: 0.08, KOROBI_SEC: 2.5, KOROBI_UP: 0.5,       // ほんとうに ころんだ
     GIRIGIRI_SEC: 0.15, GIRIGIRI_BONUS: 50,                                     // ギリギリセーフ
     KIN_EVERY: 50, KIN_CYCLES: 3,                                               // 金だるま(使っていない)
-    GOLDEN_P: 0.10, GOLDEN_P_AGAIN: 0.04, GOLDEN_SEC: 7, GOLDEN_TAP: 0.06, GOLDEN_DECAY: 0.12, GOLDEN_POINTS: 600, GOLDEN_SPEED_BONUS: 40, GOLDEN_FLOP_POINTS: 50, GOLDEN_AFTER: 1.5,   // ゴールデンだるま
+    GOLDEN_P: 0.20, GOLDEN_P_AGAIN: 0.08, GOLDEN_SEC: 9, GOLDEN_TAP: 0.065, GOLDEN_DECAY: 0.04, GOLDEN_POINTS: 300, GOLDEN_SPEED_BONUS: 25, GOLDEN_SPEED_MAX: 200, GOLDEN_FLOP_POINTS: 50, GOLDEN_FLOP_MAX: 250, GOLDEN_AFTER: 1.5,   // ゴールデンだるま
     BOUSAN_P: 0.08, SAISEN_WISH: 5, RENDA_TITLE: 15, IPPO_DROPS: 3,
     REACT_PRE: 0.60, REACT_GRACE: 0.25,   // 「!?」+ 猶予 = 0.85 秒(ふつうの予兆と同じくらい。ちょっかいが 損に なりすぎないように)
     REACT_WATCH: 0.8, REACT_SAFE_MIN: 2.5, REACT_DEMO_PRE: 1.0, TSUNTSUN_JOY_P: 0.15, FACE_COMMON_P: 0.10, FACE_RARE_P: 0.025,
@@ -228,10 +228,10 @@
       var one = function () { return (m.jitter == null ? rRange(rng, m.letter) : base * rRange(rng, [1 - m.jitter, 1 + m.jitter])) * lmul; };
       var from = clamp(o.from || 0, 0, 6);
       var spice = !o.warm && !o.tutorial && mood !== 'kin';
-      var fast = spice && from === 0 && rng() < CONFIG.SPICE_FAST;      // 早口「だるまさんがころんだ!」
+      var fast = spice && !o.early && from === 0 && rng() < CONFIG.SPICE_FAST;      // 早口「だるまさんがころんだ!」
       if (fast) one = function () { return Math.max(CONFIG.FAST_LETTER_MIN, base * CONFIG.FAST_LETTER_MUL * lmul); };
       var sp = push('SAFE', 0), i, k;
-      if (fast) sp.fast = true;
+      if (fast) { sp.fast = true; sp.say = 'すぅ…'; }   // 早口の 合図(息を吸う・頭が ゆれる)
       if (from > 0) sp.L.push({ at: t, i: from - 1, silent: true });   // 言い終わった字は そのまま
       // 言い直し「だ…だる…」(はじめから言うときだけ)
       if (from === 0 && !fast && rng() < m.restartP) {
@@ -268,7 +268,7 @@
       }
       var tell = rRange(rng, m.tell) * ((1 - CONFIG.TELL_SPEED_K) + CONFIG.TELL_SPEED_K * spd) + (o.warm ? CONFIG.WARMUP_TELL_ADD : 0);
       if (o.tutorial) tell *= CONFIG.TUTORIAL_TELL_MUL;
-      if (fast) { var fw = warn(CONFIG.TELL_MIN_FAST, false); fw.fast = true; }   // 早口でも 予兆+猶予は 0.65 秒
+      if (fast) { var fw = warn(Math.max(CONFIG.TELL_MIN, CONFIG.TELL_MIN_FAST), false); fw.fast = true; }   // 早口でも 予兆+猶予は 0.72 秒
       else warn(Math.max(CONFIG.TELL_MIN, tell), false);
     }
     var g = push('GRACE', CONFIG.GRACE); g.L.push({ at: g.s, i: 9 });
@@ -330,7 +330,7 @@
   function addCycle(S, t0, from) {
     var d = S.d, c = cycleCtx(S);
     d.cy++;
-    var arr = makeCycle(d.mood, c.stage, { warm: c.warm, tutorial: c.tutorial, from: from || 0 }, S.rng, t0);
+    var arr = makeCycle(d.mood, c.stage, { warm: c.warm, tutorial: c.tutorial, early: S.playT < CONFIG.FAST_FROM_SEC, from: from || 0 }, S.rng, t0);
     var alt = !c.warm && !c.tutorial && !from && d.mood !== 'gekido' && d.mood !== 'kin' && d.mood !== 'bikkuri' && S.rng() < CONFIG.BOUSAN_P;
     for (var i = 0; i < arr.length; i++) { arr[i].cy = d.cy; if (alt) arr[i].alt = true; d.ph.push(arr[i]); }
   }
@@ -463,15 +463,36 @@
   }
   // 反応の顔の一覧(game.js が DARUMA_ART.FACES か 仮の一覧を入れる)
   var FACE_LIST = [], JOY_IDS = ['motto', 'tehepero', 'manzara'];
+  var CRY_IDS = ['uwaan', 'ijiiji', 'itai', 'bansoukou'];                       // つんつんで なく顔
+  var UKE_IDS = ['fuita', 'jiwajiwa', 'ooke', 'kusu', 'zabuton', 'mouikkai', 'futon'];   // ダジャレが ウケた顔(ほかの ダジャレの顔は すべり)
+  // 顔の種類: joy よろこぶ / angry おこる / cry なく / uke ウケ / flop すべり / laugh わらう / neutral いつもの顔
+  function faceKind(id) {
+    var f = null; for (var i = 0; i < FACE_LIST.length; i++) if (FACE_LIST[i].id === id) { f = FACE_LIST[i]; break; }
+    if (!f) return 'neutral';
+    if (JOY_IDS.indexOf(id) >= 0) return 'joy';
+    if (f.group === 'tsuntsun') return CRY_IDS.indexOf(id) >= 0 ? 'cry' : 'angry';
+    if (f.group === 'dajare') return UKE_IDS.indexOf(id) >= 0 ? 'uke' : 'flop';
+    if (f.group === 'kusuguru') return 'laugh';
+    return 'neutral';
+  }
+  // 種類を しぼって えらぶ(10% いつもの顔・2.5% レア は そのまま)
+  function pickFaceOf(S, group, kinds) {
+    if (!FACE_LIST.length) return null;
+    var r = S.rng();
+    if (r < CONFIG.FACE_RARE_P + CONFIG.FACE_COMMON_P) return pickFace(S, r < CONFIG.FACE_RARE_P ? 'rare' : 'common', true);
+    var c = FACE_LIST.filter(function (f) { return f.group === group && kinds.indexOf(faceKind(f.id)) >= 0; });
+    if (!c.length) return pickFace(S, group);
+    return c[Math.floor(S.rng() * c.length)].id;
+  }
   function setFaces(list) { FACE_LIST = list || []; }
-  function pickFace(S, group) {
+  function pickFace(S, group, exact) {
     if (!FACE_LIST.length) return null;
     if (group === 'joy') {   // つんつんで よろこぶ顔(もっとやって・てへぺろ・まんざらでも)
       var jl = FACE_LIST.filter(function (f) { return JOY_IDS.indexOf(f.id) >= 0; });
       if (jl.length) return jl[Math.floor(S.rng() * jl.length)].id;
       group = 'kusuguru';
     }
-    var r = S.rng(), g = group;
+    var r = exact ? 1 : S.rng(), g = group;
     if (r < CONFIG.FACE_RARE_P) g = 'rare'; else if (r < CONFIG.FACE_RARE_P + CONFIG.FACE_COMMON_P) g = 'common';
     var c = FACE_LIST.filter(function (f) { return f.group === g; });
     if (!c.length) c = FACE_LIST.filter(function (f) { return f.group === group; });
@@ -681,7 +702,7 @@
     }
     if (S.golden) {
       S.golden.inflate = Math.max(0, S.golden.inflate - CONFIG.GOLDEN_DECAY * dt);
-      if (t1 >= S.golden.e) { S.score += CONFIG.GOLDEN_FLOP_POINTS; ev.push({ type: 'goldenFlop', pts: CONFIG.GOLDEN_FLOP_POINTS, inflate: S.golden.inflate }); endGolden(S, t1); }
+      if (t1 >= S.golden.e) { var fpts = CONFIG.GOLDEN_FLOP_POINTS + Math.round(CONFIG.GOLDEN_FLOP_MAX * S.golden.inflate); S.score += fpts; ev.push({ type: 'goldenFlop', pts: fpts, inflate: S.golden.inflate }); endGolden(S, t1); }   // がんばった分は もらえる
     }
     // ミステリーボックスが 開いた
     if (S.pendingMystery && t1 >= S.pendingMystery.at) {
@@ -790,7 +811,7 @@
     if (S.golden) {
       var gd = S.golden; gd.taps++; gd.inflate = Math.min(1, gd.inflate + CONFIG.GOLDEN_TAP);
       if (gd.inflate >= 1) {
-        var rate = gd.taps / Math.max(0.5, t - gd.s), pts = CONFIG.GOLDEN_POINTS + Math.round(rate * CONFIG.GOLDEN_SPEED_BONUS);
+        var rate = gd.taps / Math.max(0.5, t - gd.s), pts = CONFIG.GOLDEN_POINTS + Math.min(CONFIG.GOLDEN_SPEED_MAX, Math.round(rate * CONFIG.GOLDEN_SPEED_BONUS));
         S.score += pts; S.counts.goldenPop = (S.counts.goldenPop || 0) + 1;
         ev.push({ type: 'goldenPop', pts: pts, rate: rate }); endGolden(S, t);
       } else ev.push({ type: 'goldenTap', inflate: gd.inflate });
@@ -856,7 +877,8 @@
       S.tama -= 1;
       if (bored(S, name, t)) { setMoodRaw(S.d, 'ijiwaru', 2); ev.push(reactTurn(S, t, pickFace(S, 'common'), 'bored')); ev.push({ type: 'bored', name: name }); return ev; }
       setMoodRaw(S.d, 'gokigen', CONFIG.TICKLE_MOOD_CYCLES);
-      ev.push(reactTurn(S, t, pickFace(S, 'kusuguru'), 'kusuguru'));
+      var kf = pickFaceOf(S, 'kusuguru', ['laugh']);
+      ev.push(reactTurn(S, t, kf, faceKind(kf) === 'neutral' ? 'neutral' : 'laugh'));
       ev.push({ type: 'tickle' });
     } else if (name === 'dajare') {
       S.tama -= 1;
@@ -865,19 +887,21 @@
       var uke = rng() < DAJARE_UKE[mood];
       if (uke) { S.counts.dajareUke++; setMoodRaw(S.d, 'gokigen', 2); }
       else if (mood !== 'nemui') setMoodRaw(S.d, 'okori', 2);
-      ev.push(reactTurn(S, t, pickFace(S, 'dajare'), uke ? 'uke' : 'flop'));
+      var df = pickFaceOf(S, 'dajare', [uke ? 'uke' : 'flop']);
+      ev.push(reactTurn(S, t, df, faceKind(df) === 'neutral' ? 'neutral' : (uke ? 'uke' : 'flop')));
       ev.push({ type: 'dajare', joke: joke, uke: uke, sleep: !uke && mood === 'nemui' });
     } else if (name === 'ijiwaru') {
       S.teaseReadyAt = t + CONFIG.TEASE_COOLDOWN;
       var joy = rng() < CONFIG.TSUNTSUN_JOY_P;     // つんつんで たまに よろこぶ
-      if (joy) setMoodRaw(S.d, 'gokigen', 1);
-      else if (mood === 'okori' || mood === 'gekido') setMoodRaw(S.d, 'nakisou', 3);
+      var tf = joy ? pickFace(S, 'joy') : pickFaceOf(S, 'tsuntsun', ['angry', 'cry']), tk = faceKind(tf);
+      if (joy || tk === 'joy') { joy = true; tk = 'joy'; setMoodRaw(S.d, rng() < 0.5 ? 'gokigen' : 'tere', 1); }   // よろこぶ顔なら ごきげん か てれ
+      else if (tk === 'cry' || mood === 'okori' || mood === 'gekido') setMoodRaw(S.d, 'nakisou', 3);
       else setMoodRaw(S.d, 'okori', 4);
-      ev.push(reactTurn(S, t, pickFace(S, joy ? 'joy' : 'tsuntsun'), joy ? 'joy' : 'tsuntsun'));
+      ev.push(reactTurn(S, t, tf, tk === 'neutral' ? 'neutral' : tk));
       if (!S.tutorial && rng() < ((S.goldenCount || 0) ? CONFIG.GOLDEN_P_AGAIN : CONFIG.GOLDEN_P)) {
         for (var gi = S.d.ph.length - 1; gi >= 0; gi--) if (S.d.ph[gi].react && S.d.ph[gi].k === 'RETURN') { S.goldenAt = S.d.ph[gi].e; break; }
       }
-      ev.push({ type: 'tease', cry: !joy && (mood === 'okori' || mood === 'gekido'), joy: joy });
+      ev.push({ type: 'tease', cry: tk === 'cry', joy: joy });
     } else if (name === 'hengao') {
       // にらめっこ: こっち向きを縮めるだけ(気分は変えない)。使ったら待ち時間。同じ手を続けると あきる
       S.hengaoPh = phaseAt(S.d, t);
@@ -997,7 +1021,7 @@
     CONFIG: CONFIG, MOODS: MOODS, MOOD_KEYS: MOOD_KEYS, FACE_KEYS: FACE_KEYS, MOOD_DRIFT: MOOD_DRIFT, WARMUP_DRIFT: WARMUP_DRIFT,
     BLOCKS: BLOCKS, BLOCK_ORDER: BLOCK_ORDER, BLOCK_WEIGHTS: BLOCK_WEIGHTS, ITEM_POOL: ITEM_POOL, ITEMS: ITEMS, CHOTTO: CHOTTO, CHOTTO_KEYS: CHOTTO_KEYS,
     DAJARE: DAJARE, DAJARE_UKE: DAJARE_UKE, LINES: LINES, TITLES: TITLES,
-    setFaces: setFaces, pickFace: pickFace, reactTurn: reactTurn,
+    setFaces: setFaces, pickFace: pickFace, faceKind: faceKind, reactTurn: reactTurn,
     rankOf: rankOf, sceneOf: sceneOf, SCENES: SCENES,
     makeRng: makeRng, rRange: rRange, rInt: rInt, wpick: wpick, clamp: clamp,
     stageOf: stageOf, stageNow: stageNow, makeCycle: makeCycle, phaseAt: phaseAt, kindAt: kindAt, chantIndex: chantIndex,
